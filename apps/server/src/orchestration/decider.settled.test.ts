@@ -69,6 +69,71 @@ function makeSession(status: OrchestrationSession["status"]): OrchestrationSessi
 }
 
 it.layer(NodeServices.layer)("settled thread decider", (it) => {
+  it.effect("settles delegated descendants before their parent", () =>
+    Effect.gen(function* () {
+      const base = makeReadModel(null);
+      const parent = base.threads[0]!;
+      const child = {
+        ...parent,
+        id: ThreadId.make("thread-child"),
+        parentThreadId: parent.id,
+        title: "Child",
+      };
+      const grandchild = {
+        ...parent,
+        id: ThreadId.make("thread-grandchild"),
+        parentThreadId: child.id,
+        title: "Grandchild",
+      };
+      const decided = yield* decideOrchestrationCommand({
+        command: {
+          type: "thread.settle",
+          commandId: CommandId.make("cmd-settle-family"),
+          threadId: parent.id,
+        },
+        readModel: { ...base, threads: [parent, child, grandchild] },
+      });
+      const events = Array.isArray(decided) ? decided : [decided];
+
+      expect(events.map((event) => event.aggregateId)).toEqual([
+        child.id,
+        grandchild.id,
+        parent.id,
+      ]);
+      expect(
+        events.map((event) => (event.type === "thread.settled" ? event.payload.threadId : null)),
+      ).toEqual([child.id, grandchild.id, parent.id]);
+    }),
+  );
+
+  it.effect("rejects the whole family when a delegated child is still working", () =>
+    Effect.gen(function* () {
+      const base = makeReadModel(null);
+      const parent = base.threads[0]!;
+      const child = {
+        ...parent,
+        id: ThreadId.make("thread-child"),
+        parentThreadId: parent.id,
+        title: "Child",
+        session: {
+          ...makeSession("running"),
+          threadId: ThreadId.make("thread-child"),
+        },
+      };
+      const error = yield* decideOrchestrationCommand({
+        command: {
+          type: "thread.settle",
+          commandId: CommandId.make("cmd-settle-blocked-family"),
+          threadId: parent.id,
+        },
+        readModel: { ...base, threads: [parent, child] },
+      }).pipe(Effect.flip);
+
+      expect(error.message).toContain("thread-child");
+      expect(error.message).toContain("active session");
+    }),
+  );
+
   it.effect("settles active threads and re-emits idempotently for settled ones", () =>
     Effect.gen(function* () {
       const event = yield* decideOrchestrationCommand({

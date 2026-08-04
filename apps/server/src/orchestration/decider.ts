@@ -3,6 +3,7 @@ import {
   type OrchestrationCommand,
   type OrchestrationEvent,
   type OrchestrationReadModel,
+  type OrchestrationThread,
 } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 import * as Crypto from "effect/Crypto";
@@ -22,11 +23,11 @@ import {
 } from "./commandInvariants.ts";
 import { projectEvent } from "./projector.ts";
 import {
-  JIRA_TICKET_WORK_NOTICE_DELIVERED_ACTIVITY_KIND,
-  JIRA_TICKET_WORK_STARTED_ACTIVITY_KIND,
+  DELEGATED_WORK_NOTICE_DELIVERED_ACTIVITY_KIND,
+  DELEGATED_WORK_STARTED_ACTIVITY_KIND,
   hasJiraTicketWorkStarted,
-  pendingJiraWorkStartedNotices,
-} from "./jiraTickets.ts";
+  pendingDelegatedWorkStartedNotices,
+} from "./delegatedWork.ts";
 
 const nowIso = Effect.map(DateTime.now, DateTime.formatIso);
 
@@ -146,6 +147,34 @@ function threadHasQueuedTurnStart(
     latestUserMessageAtMs > latestTurnAtMs &&
     Math.abs(queuedAgeMs) <= QUEUED_TURN_START_GRACE_MS
   );
+}
+
+function delegatedThreadFamily(
+  readModel: OrchestrationReadModel,
+  parent: OrchestrationThread,
+): ReadonlyArray<OrchestrationThread> {
+  const family: OrchestrationThread[] = [];
+  const visited = new Set([parent.id]);
+  const pending = [parent.id];
+  while (pending.length > 0) {
+    const parentThreadId = pending.shift();
+    for (const thread of readModel.threads) {
+      if (
+        thread.parentThreadId !== parentThreadId ||
+        thread.deletedAt !== null ||
+        thread.archivedAt !== null ||
+        visited.has(thread.id)
+      ) {
+        continue;
+      }
+      visited.add(thread.id);
+      family.push(thread);
+      pending.push(thread.id);
+    }
+  }
+  // The command's aggregate stays last so its receipt still points at the
+  // thread the user explicitly settled.
+  return [...family, parent];
 }
 
 function withEventBase(
@@ -361,6 +390,19 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
         command,
         threadId: command.threadId,
       });
+      if (command.parentThreadId !== undefined && command.parentThreadId !== null) {
+        if (command.parentThreadId === command.threadId) {
+          return yield* new OrchestrationCommandInvariantError({
+            commandType: command.type,
+            detail: "A thread cannot be its own parent.",
+          });
+        }
+        yield* requireThread({
+          readModel,
+          command,
+          threadId: command.parentThreadId,
+        });
+      }
       return {
         ...(yield* withEventBase({
           aggregateKind: "thread",
@@ -372,6 +414,9 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
         payload: {
           threadId: command.threadId,
           projectId: command.projectId,
+          ...(command.parentThreadId !== undefined
+            ? { parentThreadId: command.parentThreadId }
+            : {}),
           title: command.title,
           modelSelection: command.modelSelection,
           runtimeMode: command.runtimeMode,
@@ -457,59 +502,56 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
         command,
         threadId: command.threadId,
       });
-      // Server-side twin of the client's canSettle session check: a stale
-      // or raced client must not settle a thread whose session is coming
-      // alive or working.
-      if (thread.session?.status === "starting" || thread.session?.status === "running") {
-        return yield* Effect.fail(
-          new OrchestrationCommandInvariantError({
-            commandType: command.type,
-            detail: `thread ${command.threadId} has an active session and cannot be settled`,
-          }),
-        );
-      }
-      // Pending approval / user-input requests are blocked-on-you work: a
-      // raced or stale client must not park them behind a settled override
-      // that would surface only after the request resolves.
-      if (hasOpenBlockingRequest(thread)) {
-        return yield* Effect.fail(
-          new OrchestrationCommandInvariantError({
-            commandType: command.type,
-            detail: `thread ${command.threadId} has a pending approval or user-input request and cannot be settled`,
-          }),
-        );
-      }
       const occurredAt = yield* nowIso;
-      // Settling inside the adoption window would hide just-requested work.
-      if (threadHasQueuedTurnStart(thread, occurredAt)) {
-        return yield* Effect.fail(
-          new OrchestrationCommandInvariantError({
+      const family = delegatedThreadFamily(readModel, thread);
+      for (const member of family) {
+        // Validate the entire family before emitting anything so a blocked
+        // child cannot leave a partially settled group.
+        if (member.session?.status === "starting" || member.session?.status === "running") {
+          return yield* new OrchestrationCommandInvariantError({
             commandType: command.type,
-            detail: `thread ${command.threadId} has a queued turn start and cannot be settled`,
-          }),
-        );
+            detail: `thread ${member.id} has an active session and cannot be settled`,
+          });
+        }
+        if (hasOpenBlockingRequest(member)) {
+          return yield* new OrchestrationCommandInvariantError({
+            commandType: command.type,
+            detail: `thread ${member.id} has a pending approval or user-input request and cannot be settled`,
+          });
+        }
+        if (threadHasQueuedTurnStart(member, occurredAt)) {
+          return yield* new OrchestrationCommandInvariantError({
+            commandType: command.type,
+            detail: `thread ${member.id} has a queued turn start and cannot be settled`,
+          });
+        }
       }
-      // Settling an already-settled thread re-emits with the original
-      // settledAt: the engine rejects zero-event commands, and bulk-settle /
-      // double-click must stay silent no-ops rather than surface errors.
-      const alreadySettled = thread.settledOverride === "settled" && thread.settledAt !== null;
-      return {
-        ...(yield* withEventBase({
-          aggregateKind: "thread",
-          aggregateId: command.threadId,
-          occurredAt,
-          commandId: command.commandId,
-        })),
-        type: "thread.settled",
-        payload: {
-          threadId: command.threadId,
-          settledAt: alreadySettled ? thread.settledAt : occurredAt,
-          // A re-emission is a projected no-op: keep the existing updatedAt
-          // so duplicate settles neither rewind nor churn ordering. A fresh
-          // settle stamps the command time.
-          updatedAt: alreadySettled ? thread.updatedAt : occurredAt,
-        },
-      };
+
+      return yield* Effect.forEach(family, (member) =>
+        Effect.gen(function* () {
+          // Settling an already-settled thread re-emits with the original
+          // settledAt: the engine rejects zero-event commands, and bulk-settle /
+          // double-click must stay silent no-ops rather than surface errors.
+          const alreadySettled = member.settledOverride === "settled" && member.settledAt !== null;
+          return {
+            ...(yield* withEventBase({
+              aggregateKind: "thread",
+              aggregateId: member.id,
+              occurredAt,
+              commandId: command.commandId,
+            })),
+            type: "thread.settled" as const,
+            payload: {
+              threadId: member.id,
+              settledAt: alreadySettled ? member.settledAt : occurredAt,
+              // A re-emission is a projected no-op: keep the existing updatedAt
+              // so duplicate settles neither rewind nor churn ordering. A fresh
+              // settle stamps the command time.
+              updatedAt: alreadySettled ? member.updatedAt : occurredAt,
+            },
+          };
+        }),
+      );
     }
 
     case "thread.unsettle": {
@@ -761,30 +803,43 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
         threadId: command.threadId,
       });
       const sourceJiraTicket = command.sourceJiraTicket;
-      const sourceJiraThread = sourceJiraTicket
+      const sourceDelegatedWork =
+        command.sourceDelegatedWork ??
+        (sourceJiraTicket
+          ? {
+              sourceThreadId: sourceJiraTicket.sourceThreadId,
+              title: `${sourceJiraTicket.issueKey}: ${sourceJiraTicket.issueSummary}`,
+              jiraTicket: {
+                issueKey: sourceJiraTicket.issueKey,
+                issueSummary: sourceJiraTicket.issueSummary,
+                issueUrl: sourceJiraTicket.issueUrl,
+              },
+            }
+          : undefined);
+      const sourceDelegatingThread = sourceDelegatedWork
         ? yield* requireThread({
             readModel,
             command,
-            threadId: sourceJiraTicket.sourceThreadId,
+            threadId: sourceDelegatedWork.sourceThreadId,
           })
         : null;
-      if (sourceJiraThread?.id === targetThread.id) {
+      if (sourceDelegatingThread?.id === targetThread.id) {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
-          detail: "Jira ticket work must start in a different thread.",
+          detail: "Delegated work must start in a different thread.",
         });
       }
       if (
-        sourceJiraThread &&
-        sourceJiraTicket &&
-        hasJiraTicketWorkStarted(sourceJiraThread, sourceJiraTicket.issueKey)
+        sourceDelegatingThread &&
+        sourceDelegatedWork?.jiraTicket &&
+        hasJiraTicketWorkStarted(sourceDelegatingThread, sourceDelegatedWork.jiraTicket.issueKey)
       ) {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
-          detail: `Work has already started for Jira ticket '${sourceJiraTicket.issueKey}'.`,
+          detail: `Work has already started for Jira ticket '${sourceDelegatedWork.jiraTicket.issueKey}'.`,
         });
       }
-      const jiraWorkStartedNotices = pendingJiraWorkStartedNotices(targetThread);
+      const delegatedWorkStartedNotices = pendingDelegatedWorkStartedNotices(targetThread);
       const sourceProposedPlan = command.sourceProposedPlan;
       const sourceThread = sourceProposedPlan
         ? yield* requireThread({
@@ -848,7 +903,7 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
           runtimeMode: targetThread.runtimeMode,
           interactionMode: targetThread.interactionMode,
           ...(sourceProposedPlan !== undefined ? { sourceProposedPlan } : {}),
-          ...(jiraWorkStartedNotices.length > 0 ? { jiraWorkStartedNotices } : {}),
+          ...(delegatedWorkStartedNotices.length > 0 ? { delegatedWorkStartedNotices } : {}),
           createdAt: command.createdAt,
         },
       };
@@ -890,26 +945,28 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
           },
         });
       }
-      const jiraRelationshipEvents: Array<Omit<OrchestrationEvent, "sequence">> = [];
-      if (sourceJiraTicket) {
+      const delegatedWorkRelationshipEvents: Array<Omit<OrchestrationEvent, "sequence">> = [];
+      if (sourceDelegatedWork) {
         const eventBase = yield* withEventBase({
           aggregateKind: "thread",
-          aggregateId: sourceJiraTicket.sourceThreadId,
+          aggregateId: sourceDelegatedWork.sourceThreadId,
           occurredAt: command.createdAt,
           commandId: command.commandId,
         });
-        jiraRelationshipEvents.push({
+        delegatedWorkRelationshipEvents.push({
           ...eventBase,
           type: "thread.activity-appended",
           payload: {
-            threadId: sourceJiraTicket.sourceThreadId,
+            threadId: sourceDelegatedWork.sourceThreadId,
             activity: {
               id: eventBase.eventId,
               tone: "info",
-              kind: JIRA_TICKET_WORK_STARTED_ACTIVITY_KIND,
-              summary: `Work started on ${sourceJiraTicket.issueKey}`,
+              kind: DELEGATED_WORK_STARTED_ACTIVITY_KIND,
+              summary: sourceDelegatedWork.jiraTicket
+                ? `Work started on ${sourceDelegatedWork.jiraTicket.issueKey}`
+                : `Delegated work: ${sourceDelegatedWork.title}`,
               payload: {
-                ...sourceJiraTicket,
+                ...sourceDelegatedWork,
                 workThreadId: command.threadId,
               },
               turnId: null,
@@ -918,14 +975,14 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
           },
         });
       }
-      for (const notice of jiraWorkStartedNotices) {
+      for (const notice of delegatedWorkStartedNotices) {
         const eventBase = yield* withEventBase({
           aggregateKind: "thread",
           aggregateId: command.threadId,
           occurredAt: command.createdAt,
           commandId: command.commandId,
         });
-        jiraRelationshipEvents.push({
+        delegatedWorkRelationshipEvents.push({
           ...eventBase,
           type: "thread.activity-appended",
           payload: {
@@ -933,10 +990,11 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
             activity: {
               id: eventBase.eventId,
               tone: "info",
-              kind: JIRA_TICKET_WORK_NOTICE_DELIVERED_ACTIVITY_KIND,
-              summary: `Agent notified about ${notice.issueKey}`,
+              kind: DELEGATED_WORK_NOTICE_DELIVERED_ACTIVITY_KIND,
+              summary: notice.jiraTicket
+                ? `Agent notified about ${notice.jiraTicket.issueKey}`
+                : `Agent notified about delegated work`,
               payload: {
-                issueKey: notice.issueKey,
                 workThreadId: notice.workThreadId,
               },
               turnId: null,
@@ -949,7 +1007,7 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
         ...lifecycleResetEvents,
         userMessageEvent,
         turnStartRequestedEvent,
-        ...jiraRelationshipEvents,
+        ...delegatedWorkRelationshipEvents,
       ];
     }
 

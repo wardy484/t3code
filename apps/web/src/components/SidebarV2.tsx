@@ -110,6 +110,7 @@ import {
   buildBulkTitleRegenerationContextMenuItem,
   formatWorkingDurationLabel,
   firstValidTimestampMs,
+  groupActiveSidebarThreads,
   hasUnseenCompletion,
   isTrailingDoubleClick,
   orderItemsByPreferredIds,
@@ -387,6 +388,7 @@ function SnoozePopoverButton(props: {
 const SidebarV2Row = memo(function SidebarV2Row(props: {
   thread: SidebarThreadSummary;
   variant: "card" | "slim";
+  hierarchyRole: "parent" | "child" | null;
   // Slim rows are either settled (action: un-settle) or merely quiet
   // (seen Ready threads — action: settle).
   variantAction: "settle" | "unsettle" | "unsnooze";
@@ -785,7 +787,10 @@ const SidebarV2Row = memo(function SidebarV2Row(props: {
     return (
       <li
         data-thread-item
-        className="list-none [content-visibility:auto] [contain-intrinsic-size:auto_34px]"
+        className={cn(
+          "list-none [content-visibility:auto] [contain-intrinsic-size:auto_34px]",
+          props.hierarchyRole === "parent" && "mt-1",
+        )}
       >
         <Tooltip>
           <TooltipTrigger
@@ -795,7 +800,11 @@ const SidebarV2Row = memo(function SidebarV2Row(props: {
                 tabIndex={0}
                 data-testid="sidebar-v2-row-slim"
                 aria-busy={isRegeneratingTitle || undefined}
-                className={cn(rowSurfaceClassName, "flex h-9 items-center gap-2.5 px-2.5")}
+                className={cn(
+                  rowSurfaceClassName,
+                  "flex h-9 items-center gap-2.5 px-2.5",
+                  props.hierarchyRole === "parent" && "h-8",
+                )}
                 onClick={handleClick}
                 onDoubleClick={handleDoubleClick}
                 onKeyDown={handleKeyDown}
@@ -901,7 +910,11 @@ const SidebarV2Row = memo(function SidebarV2Row(props: {
   return (
     <li
       data-thread-item
-      className="list-none py-0.5 [content-visibility:auto] [contain-intrinsic-size:auto_96px]"
+      className={cn(
+        "list-none py-0.5 [content-visibility:auto] [contain-intrinsic-size:auto_96px]",
+        props.hierarchyRole === "child" &&
+          "ml-3 w-[calc(100%-0.75rem)] border-l border-sidebar-border/60 pl-1.5",
+      )}
     >
       <Tooltip>
         <TooltipTrigger
@@ -1634,6 +1647,7 @@ export default function SidebarV2() {
     () => [...activeThreads, ...snoozedThreads, ...settledThreads],
     [activeThreads, settledThreads, snoozedThreads],
   );
+  const activeThreadRows = useMemo(() => groupActiveSidebarThreads(activeThreads), [activeThreads]);
   const threadSearchResults = useMemo(
     () => searchSidebarThreadsByTitle(searchableThreads, threadSearchQuery),
     [searchableThreads, threadSearchQuery],
@@ -1736,8 +1750,12 @@ export default function SidebarV2() {
   }, [routeThreadKey, snoozedShelfExpanded, snoozedThreads]);
 
   const orderedThreads = useMemo(
-    () => [...activeThreads, ...visibleSnoozedThreads, ...renderedSettledThreads],
-    [activeThreads, visibleSnoozedThreads, renderedSettledThreads],
+    () => [
+      ...activeThreadRows.map((row) => row.thread),
+      ...visibleSnoozedThreads,
+      ...renderedSettledThreads,
+    ],
+    [activeThreadRows, visibleSnoozedThreads, renderedSettledThreads],
   );
   const orderedThreadKeys = useMemo(
     () =>
@@ -2831,6 +2849,7 @@ export default function SidebarV2() {
                   const renderThreadRow = (
                     thread: EnvironmentThreadShell,
                     section: "active" | "snoozed" | "settled",
+                    hierarchyRole: "parent" | "child" | null = null,
                   ) => {
                     const threadKey = scopedThreadKey(
                       scopeThreadRef(thread.environmentId, thread.id),
@@ -2839,7 +2858,7 @@ export default function SidebarV2() {
                     // row: every other thread is a full card. Density comes
                     // from users (or the auto rules) actually parking work,
                     // not from the sidebar second-guessing what still matters.
-                    const isCard = section === "active";
+                    const isCard = section === "active" && hierarchyRole !== "parent";
                     const rowVariant = isCard ? "card" : "slim";
                     return (
                       <SidebarV2Row
@@ -2852,6 +2871,7 @@ export default function SidebarV2() {
                         key={`${threadKey}:${rowVariant}`}
                         thread={thread}
                         variant={rowVariant}
+                        hierarchyRole={hierarchyRole}
                         // Snoozed rows wake; settled rows un-settle (explicit
                         // settles clear the override, auto-settled rows get
                         // pinned active); cards settle.
@@ -2912,8 +2932,8 @@ export default function SidebarV2() {
                       />
                     );
                   };
-                  const items: ReactNode[] = activeThreads.map((thread) =>
-                    renderThreadRow(thread, "active"),
+                  const items: ReactNode[] = activeThreadRows.map((row) =>
+                    renderThreadRow(row.thread, "active", row.hierarchyRole),
                   );
                   // Snoozed shelf: between the inbox and Settled — out of the
                   // way, never gone. The header always renders while anything

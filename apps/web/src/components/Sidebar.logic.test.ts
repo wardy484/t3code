@@ -9,6 +9,7 @@ import {
   resolveAdjacentThreadId,
   getFallbackThreadIdAfterDelete,
   getVisibleThreadsForProject,
+  groupActiveSidebarThreads,
   getProjectSortTimestamp,
   hasUnseenCompletion,
   isContextMenuPointerDown,
@@ -47,6 +48,54 @@ import {
 } from "../types";
 
 const localEnvironmentId = EnvironmentId.make("environment-local");
+
+describe("groupActiveSidebarThreads", () => {
+  it("places delegated children after a compact parent without moving unrelated groups", () => {
+    const rows = groupActiveSidebarThreads([
+      { environmentId: "env", id: "newest", parentThreadId: null },
+      { environmentId: "env", id: "child-2", parentThreadId: "parent" },
+      { environmentId: "env", id: "parent", parentThreadId: null },
+      { environmentId: "env", id: "child-1", parentThreadId: "parent" },
+      { environmentId: "env", id: "oldest", parentThreadId: null },
+    ]);
+
+    expect(rows).toEqual([
+      {
+        thread: { environmentId: "env", id: "newest", parentThreadId: null },
+        hierarchyRole: null,
+      },
+      {
+        thread: { environmentId: "env", id: "parent", parentThreadId: null },
+        hierarchyRole: "parent",
+      },
+      {
+        thread: { environmentId: "env", id: "child-2", parentThreadId: "parent" },
+        hierarchyRole: "child",
+      },
+      {
+        thread: { environmentId: "env", id: "child-1", parentThreadId: "parent" },
+        hierarchyRole: "child",
+      },
+      {
+        thread: { environmentId: "env", id: "oldest", parentThreadId: null },
+        hierarchyRole: null,
+      },
+    ]);
+  });
+
+  it("keeps a child standalone when its parent is outside the visible scope", () => {
+    expect(
+      groupActiveSidebarThreads([
+        { environmentId: "env", id: "child", parentThreadId: "hidden-parent" },
+      ]),
+    ).toEqual([
+      {
+        thread: { environmentId: "env", id: "child", parentThreadId: "hidden-parent" },
+        hierarchyRole: null,
+      },
+    ]);
+  });
+});
 
 describe("shouldNavigateAfterProjectRemoval", () => {
   const projectThreads = [{ environmentId: "environment-local", id: "thread-1" }];

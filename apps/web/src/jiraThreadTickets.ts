@@ -1,4 +1,5 @@
 import {
+  DelegatedWorkStartedActivityPayload,
   JiraTicketWorkStartedActivityPayload,
   type OrchestrationThread,
   type ThreadId,
@@ -7,6 +8,7 @@ import * as Schema from "effect/Schema";
 
 const JIRA_ISSUE_KEY_PATTERN = /\b([A-Z][A-Z0-9_]{1,19}-\d+)\b/gi;
 const isWorkStartedPayload = Schema.is(JiraTicketWorkStartedActivityPayload);
+const isDelegatedWorkStartedPayload = Schema.is(DelegatedWorkStartedActivityPayload);
 
 export interface JiraThreadTicketRelationship {
   readonly issueKey: string;
@@ -32,14 +34,26 @@ export function deriveJiraTicketRelationships(
 ): ReadonlyMap<string, JiraThreadTicketRelationship> {
   const relationships = new Map<string, JiraThreadTicketRelationship>();
   for (const activity of activities) {
-    if (activity.kind !== "jira.ticket.work-started" || !isWorkStartedPayload(activity.payload)) {
-      continue;
+    if (
+      activity.kind === "delegated-work.started" &&
+      isDelegatedWorkStartedPayload(activity.payload) &&
+      activity.payload.jiraTicket
+    ) {
+      const issueKey = activity.payload.jiraTicket.issueKey.toUpperCase();
+      relationships.set(issueKey, {
+        issueKey,
+        workThreadId: activity.payload.workThreadId,
+      });
+    } else if (
+      activity.kind === "jira.ticket.work-started" &&
+      isWorkStartedPayload(activity.payload)
+    ) {
+      const issueKey = activity.payload.issueKey.toUpperCase();
+      relationships.set(issueKey, {
+        issueKey,
+        workThreadId: activity.payload.workThreadId,
+      });
     }
-    const issueKey = activity.payload.issueKey.toUpperCase();
-    relationships.set(issueKey, {
-      issueKey,
-      workThreadId: activity.payload.workThreadId,
-    });
   }
   return relationships;
 }
