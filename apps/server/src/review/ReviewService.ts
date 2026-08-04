@@ -70,6 +70,28 @@ export const make = Effect.gen(function* () {
       return;
     }
 
+    const linkedWorktreeRoots = yield* git
+      .execute({
+        operation: "ReviewService.assertWorkspaceBoundCwd.listWorktrees",
+        cwd: config.cwd,
+        args: ["worktree", "list", "--porcelain", "-z"],
+      })
+      .pipe(
+        Effect.map((result) =>
+          result.stdout
+            .split("\0")
+            .filter((line) => line.startsWith("worktree "))
+            .map((line) => line.slice("worktree ".length)),
+        ),
+        Effect.orElseSucceed(() => []),
+      );
+    const canonicalLinkedWorktreeRoots = yield* Effect.all(
+      linkedWorktreeRoots.map(canonicalizePath),
+    );
+    if (canonicalLinkedWorktreeRoots.some((root) => isWithinRoot(candidate, root))) {
+      return;
+    }
+
     return yield* new VcsRepositoryDetectionError({
       operation: "ReviewService.getDiffPreview",
       cwd,

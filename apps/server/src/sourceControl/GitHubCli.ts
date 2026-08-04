@@ -203,6 +203,7 @@ export class GitHubCli extends Context.Service<
       readonly cwd: string;
       readonly args: ReadonlyArray<string>;
       readonly timeoutMs?: number;
+      readonly stdin?: string;
     }) => Effect.Effect<VcsProcess.VcsProcessOutput, GitHubCliError>;
 
     readonly listOpenPullRequests: (input: {
@@ -313,6 +314,7 @@ export const make = Effect.gen(function* () {
         command: "gh",
         args: input.args,
         cwd: input.cwd,
+        ...(input.stdin !== undefined ? { stdin: input.stdin } : {}),
         timeoutMs: input.timeoutMs ?? DEFAULT_TIMEOUT_MS,
       })
       .pipe(Effect.mapError((error) => fromVcsError({ command: "gh", cwd: input.cwd }, error)));

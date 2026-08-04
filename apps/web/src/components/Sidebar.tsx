@@ -124,6 +124,7 @@ import { stackedThreadToast, toastManager } from "./ui/toast";
 import { formatRelativeTimeLabel } from "../timestampFormat";
 import { SettingsSidebarNav } from "./settings/SettingsSidebarNav";
 import { JiraSidebarButton } from "./JiraSidebarButton";
+import { PullRequestsSidebarButton } from "./PullRequestsSidebarButton";
 import { Kbd } from "./ui/kbd";
 import {
   getArm64IntelBuildWarningDescription,
@@ -2847,6 +2848,9 @@ const SidebarProjectsContent = memo(function SidebarProjectsContent(
             </SidebarMenuItem>
             <SidebarMenuItem>
               <JiraSidebarButton />
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <PullRequestsSidebarButton />
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>

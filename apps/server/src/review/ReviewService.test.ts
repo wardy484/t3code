@@ -4,6 +4,7 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as PlatformError from "effect/PlatformError";
+import { ChildProcessSpawner } from "effect/unstable/process";
 
 import { ServerConfig } from "../config.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
@@ -14,6 +15,7 @@ function makeLayer(input: {
   readonly workspaceRoot: string;
   readonly baseDir: string;
   readonly detectCalls?: Array<{ readonly cwd: string }>;
+  readonly linkedWorktrees?: ReadonlyArray<string>;
 }) {
   return ReviewService.layer.pipe(
     Layer.provide(
@@ -27,7 +29,20 @@ function makeLayer(input: {
           }),
       }),
     ),
-    Layer.provide(Layer.mock(GitVcsDriver.GitVcsDriver)({})),
+    Layer.provide(
+      Layer.mock(GitVcsDriver.GitVcsDriver)({
+        execute: () =>
+          Effect.succeed({
+            exitCode: ChildProcessSpawner.ExitCode(0),
+            stdout: (input.linkedWorktrees ?? [])
+              .map((worktree) => `worktree ${worktree}\0HEAD abc\0\0`)
+              .join(""),
+            stderr: "",
+            stdoutTruncated: false,
+            stderrTruncated: false,
+          }),
+      }),
+    ),
     Layer.provide(ServerConfig.layerTest(input.workspaceRoot, input.baseDir)),
     Layer.provideMerge(NodeServices.layer),
   );
@@ -72,6 +87,36 @@ describe("ReviewService", () => {
       assert.strictEqual(result.cwd, workspaceRoot);
       assert.deepStrictEqual(result.sources, []);
       assert.deepStrictEqual(detectCalls, [{ cwd: workspaceRoot }]);
+    }).pipe(Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect("allows diff preview cwd inside a linked git worktree", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const workspaceRoot = yield* fs.makeTempDirectoryScoped({ prefix: "t3-review-workspace-" });
+      const linkedWorktree = yield* fs.makeTempDirectoryScoped({
+        prefix: "t3-review-linked-",
+      });
+      const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-review-base-" });
+      const detectCalls: Array<{ readonly cwd: string }> = [];
+
+      const result = yield* Effect.gen(function* () {
+        const review = yield* ReviewService.ReviewService;
+        return yield* review.getDiffPreview({ cwd: linkedWorktree });
+      }).pipe(
+        Effect.provide(
+          makeLayer({
+            workspaceRoot,
+            baseDir,
+            linkedWorktrees: [linkedWorktree],
+            detectCalls,
+          }),
+        ),
+      );
+
+      assert.strictEqual(result.cwd, linkedWorktree);
+      assert.deepStrictEqual(result.sources, []);
+      assert.deepStrictEqual(detectCalls, [{ cwd: linkedWorktree }]);
     }).pipe(Effect.provide(NodeServices.layer)),
   );
 

@@ -1,6 +1,12 @@
 import * as Schema from "effect/Schema";
 import { NonNegativeInt, PositiveInt, ThreadId, TrimmedNonEmptyString } from "./baseSchemas.ts";
-import { SourceControlProviderError, SourceControlProviderInfo } from "./sourceControl.ts";
+import {
+  ChangeRequestReviewComment,
+  ChangeRequestReviewEvent,
+  RelevantChangeRequest,
+  SourceControlProviderError,
+  SourceControlProviderInfo,
+} from "./sourceControl.ts";
 import { VcsDriverKind } from "./vcs.ts";
 
 const TrimmedNonEmptyStringSchema = TrimmedNonEmptyString;
@@ -149,6 +155,22 @@ export const GitPullRequestRefInput = Schema.Struct({
 });
 export type GitPullRequestRefInput = typeof GitPullRequestRefInput.Type;
 
+export const GitListRelevantPullRequestsInput = Schema.Struct({
+  cwd: TrimmedNonEmptyStringSchema,
+  limit: Schema.optional(PositiveInt.check(Schema.isLessThanOrEqualTo(100))),
+});
+export type GitListRelevantPullRequestsInput = typeof GitListRelevantPullRequestsInput.Type;
+
+export const GitSubmitPullRequestReviewInput = Schema.Struct({
+  cwd: TrimmedNonEmptyStringSchema,
+  pullRequestUrl: TrimmedNonEmptyStringSchema,
+  pullRequestNumber: PositiveInt,
+  event: ChangeRequestReviewEvent,
+  body: Schema.optional(Schema.String),
+  comments: Schema.Array(ChangeRequestReviewComment),
+});
+export type GitSubmitPullRequestReviewInput = typeof GitSubmitPullRequestReviewInput.Type;
+
 export const GitPreparePullRequestThreadInput = Schema.Struct({
   cwd: TrimmedNonEmptyStringSchema,
   reference: GitPullRequestReference,
@@ -271,6 +293,17 @@ export const GitResolvePullRequestResult = Schema.Struct({
   pullRequest: GitResolvedPullRequest,
 });
 export type GitResolvePullRequestResult = typeof GitResolvePullRequestResult.Type;
+
+export const GitListRelevantPullRequestsResult = Schema.Struct({
+  supported: Schema.Boolean,
+  pullRequests: Schema.Array(RelevantChangeRequest),
+});
+export type GitListRelevantPullRequestsResult = typeof GitListRelevantPullRequestsResult.Type;
+
+export const GitSubmitPullRequestReviewResult = Schema.Struct({
+  submitted: Schema.Literal(true),
+});
+export type GitSubmitPullRequestReviewResult = typeof GitSubmitPullRequestReviewResult.Type;
 
 export const GitPreparePullRequestThreadResult = Schema.Struct({
   pullRequest: GitResolvedPullRequest,

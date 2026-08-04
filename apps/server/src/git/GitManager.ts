@@ -18,6 +18,10 @@ import {
   GitCommandError,
   GitPreparePullRequestThreadInput,
   GitPreparePullRequestThreadResult,
+  GitListRelevantPullRequestsInput,
+  GitListRelevantPullRequestsResult,
+  GitSubmitPullRequestReviewInput,
+  GitSubmitPullRequestReviewResult,
   GitPullRequestRefInput,
   GitResolvePullRequestResult,
   GitRunStackedActionInput,
@@ -93,6 +97,12 @@ export class GitManager extends Context.Service<
     readonly resolvePullRequest: (
       input: GitPullRequestRefInput,
     ) => Effect.Effect<GitResolvePullRequestResult, GitManagerServiceError>;
+    readonly listRelevantPullRequests: (
+      input: GitListRelevantPullRequestsInput,
+    ) => Effect.Effect<GitListRelevantPullRequestsResult, GitManagerServiceError>;
+    readonly submitPullRequestReview: (
+      input: GitSubmitPullRequestReviewInput,
+    ) => Effect.Effect<GitSubmitPullRequestReviewResult, GitManagerServiceError>;
     readonly preparePullRequestThread: (
       input: GitPreparePullRequestThreadInput,
     ) => Effect.Effect<GitPreparePullRequestThreadResult, GitManagerServiceError>;
@@ -2133,6 +2143,39 @@ export const make = Effect.gen(function* () {
     },
   );
 
+  const listRelevantPullRequests: GitManager["Service"]["listRelevantPullRequests"] = Effect.fn(
+    "listRelevantPullRequests",
+  )(function* (input) {
+    const provider = yield* sourceControlProvider(input.cwd);
+    if (provider.kind !== "github" || !provider.listRelevantChangeRequests) {
+      return { supported: false, pullRequests: [] };
+    }
+    const pullRequests = yield* provider.listRelevantChangeRequests({
+      cwd: input.cwd,
+      ...(input.limit !== undefined ? { limit: input.limit } : {}),
+    });
+    return { supported: true, pullRequests };
+  });
+
+  const submitPullRequestReview: GitManager["Service"]["submitPullRequestReview"] = Effect.fn(
+    "submitPullRequestReview",
+  )(function* (input) {
+    const provider = yield* sourceControlProvider(input.cwd);
+    if (provider.kind !== "github" || !provider.submitChangeRequestReview) {
+      return yield* new GitManagerError({
+        operation: "submitPullRequestReview",
+        cwd: input.cwd,
+        detail: "GitHub pull request reviews are unavailable for this repository.",
+      });
+    }
+    const { body, ...review } = input;
+    yield* provider.submitChangeRequestReview({
+      ...review,
+      ...(body !== undefined ? { body } : {}),
+    });
+    return { submitted: true };
+  });
+
   return GitManager.of({
     localStatus,
     remoteStatus,
@@ -2141,6 +2184,8 @@ export const make = Effect.gen(function* () {
     invalidateRemoteStatus,
     invalidateStatus,
     resolvePullRequest,
+    listRelevantPullRequests,
+    submitPullRequestReview,
     preparePullRequestThread,
     runStackedAction,
   });

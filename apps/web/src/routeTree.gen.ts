@@ -25,6 +25,7 @@ import { Route as SettingsBetaRouteImport } from './routes/settings.beta'
 import { Route as SettingsArchivedRouteImport } from './routes/settings.archived'
 import { Route as SettingsAppearanceRouteImport } from './routes/settings.appearance'
 import { Route as ConnectCallbackRouteImport } from './routes/connect_.callback'
+import { Route as ChatPullRequestsRouteImport } from './routes/_chat.pull-requests'
 import { Route as ChatKanbanRouteImport } from './routes/_chat.kanban'
 import { Route as ChatDraftDraftIdRouteImport } from './routes/_chat.draft.$draftId'
 import { Route as ChatEnvironmentIdThreadIdRouteImport } from './routes/_chat.$environmentId.$threadId'
@@ -108,6 +109,11 @@ const ConnectCallbackRoute = ConnectCallbackRouteImport.update({
   path: '/connect/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ChatPullRequestsRoute = ChatPullRequestsRouteImport.update({
+  id: '/pull-requests',
+  path: '/pull-requests',
+  getParentRoute: () => ChatRoute,
+} as any)
 const ChatKanbanRoute = ChatKanbanRouteImport.update({
   id: '/kanban',
   path: '/kanban',
@@ -131,6 +137,7 @@ export interface FileRoutesByFullPath {
   '/pair': typeof PairRoute
   '/settings': typeof SettingsRouteWithChildren
   '/kanban': typeof ChatKanbanRoute
+  '/pull-requests': typeof ChatPullRequestsRoute
   '/connect/callback': typeof ConnectCallbackRoute
   '/settings/appearance': typeof SettingsAppearanceRoute
   '/settings/archived': typeof SettingsArchivedRoute
@@ -150,6 +157,7 @@ export interface FileRoutesByTo {
   '/pair': typeof PairRoute
   '/settings': typeof SettingsRouteWithChildren
   '/kanban': typeof ChatKanbanRoute
+  '/pull-requests': typeof ChatPullRequestsRoute
   '/connect/callback': typeof ConnectCallbackRoute
   '/settings/appearance': typeof SettingsAppearanceRoute
   '/settings/archived': typeof SettingsArchivedRoute
@@ -172,6 +180,7 @@ export interface FileRoutesById {
   '/pair': typeof PairRoute
   '/settings': typeof SettingsRouteWithChildren
   '/_chat/kanban': typeof ChatKanbanRoute
+  '/_chat/pull-requests': typeof ChatPullRequestsRoute
   '/connect_/callback': typeof ConnectCallbackRoute
   '/settings/appearance': typeof SettingsAppearanceRoute
   '/settings/archived': typeof SettingsArchivedRoute
@@ -195,6 +204,7 @@ export interface FileRouteTypes {
     | '/pair'
     | '/settings'
     | '/kanban'
+    | '/pull-requests'
     | '/connect/callback'
     | '/settings/appearance'
     | '/settings/archived'
@@ -214,6 +224,7 @@ export interface FileRouteTypes {
     | '/pair'
     | '/settings'
     | '/kanban'
+    | '/pull-requests'
     | '/connect/callback'
     | '/settings/appearance'
     | '/settings/archived'
@@ -235,6 +246,7 @@ export interface FileRouteTypes {
     | '/pair'
     | '/settings'
     | '/_chat/kanban'
+    | '/_chat/pull-requests'
     | '/connect_/callback'
     | '/settings/appearance'
     | '/settings/archived'
@@ -373,6 +385,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConnectCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_chat/pull-requests': {
+      id: '/_chat/pull-requests'
+      path: '/pull-requests'
+      fullPath: '/pull-requests'
+      preLoaderRoute: typeof ChatPullRequestsRouteImport
+      parentRoute: typeof ChatRoute
+    }
     '/_chat/kanban': {
       id: '/_chat/kanban'
       path: '/kanban'
@@ -399,6 +418,7 @@ declare module '@tanstack/react-router' {
 
 interface ChatRouteChildren {
   ChatKanbanRoute: typeof ChatKanbanRoute
+  ChatPullRequestsRoute: typeof ChatPullRequestsRoute
   ChatIndexRoute: typeof ChatIndexRoute
   ChatEnvironmentIdThreadIdRoute: typeof ChatEnvironmentIdThreadIdRoute
   ChatDraftDraftIdRoute: typeof ChatDraftDraftIdRoute
@@ -406,6 +426,7 @@ interface ChatRouteChildren {
 
 const ChatRouteChildren: ChatRouteChildren = {
   ChatKanbanRoute: ChatKanbanRoute,
+  ChatPullRequestsRoute: ChatPullRequestsRoute,
   ChatIndexRoute: ChatIndexRoute,
   ChatEnvironmentIdThreadIdRoute: ChatEnvironmentIdThreadIdRoute,
   ChatDraftDraftIdRoute: ChatDraftDraftIdRoute,

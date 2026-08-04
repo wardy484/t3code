@@ -14,6 +14,9 @@ import {
   ChevronsDownUpIcon,
   ChevronsUpDownIcon,
   Columns2Icon,
+  FileCodeIcon,
+  GitPullRequestIcon,
+  ListTreeIcon,
   PilcrowIcon,
   Rows3Icon,
   SearchIcon,
@@ -21,7 +24,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useOpenInPreferredEditor } from "../editorPreferences";
-import { type DraftId } from "../composerDraftStore";
+import { type DraftId, useComposerDraftStore, useComposerThreadDraft } from "../composerDraftStore";
 import { openDiffFilePrimaryAction } from "../diffFileActions";
 import { useCheckpointDiff } from "~/lib/checkpointDiffState";
 import { cn } from "~/lib/utils";
@@ -71,6 +74,8 @@ import { serverEnvironment } from "../state/server";
 import { reviewEnvironment } from "../state/review";
 import { vcsEnvironment } from "../state/vcs";
 import { buildBaseRefChoices, filterBaseRefChoices } from "../lib/baseRefChoices";
+import { buildPullRequestReviewComments } from "../pullRequestReview";
+import { PullRequestReviewDialog } from "./PullRequestReviewDialog";
 
 type DiffRenderMode = "stacked" | "split";
 type DiffThemeType = "light" | "dark";
@@ -198,14 +203,19 @@ export default function DiffPanel({
   const settings = useClientSettings();
   const [initialGitScope] = useState(initialGitScopeProp);
   const [diffRenderMode, setDiffRenderMode] = useState<DiffRenderMode>("stacked");
+  const [reviewView, setReviewView] = useState<"diff" | "guided">("diff");
+  const [requestedReviewFileKey, setRequestedReviewFileKey] = useState<string | null>(null);
   const [wordWrap, setWordWrap] = useState(settings.wordWrap);
   const [diffIgnoreWhitespace, setDiffIgnoreWhitespace] = useState(settings.diffIgnoreWhitespace);
   const [baseRefQuery, setBaseRefQuery] = useState("");
+  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
   const [collapsedDiffFiles, setCollapsedDiffFiles] = useState<CollapsedDiffFilesState>(() => ({
     scopeKey: null,
     fileKeys: EMPTY_COLLAPSED_DIFF_FILE_KEYS,
   }));
   const codeViewRef = useRef<AnnotatableCodeViewHandle>(null);
+  const composerDraft = useComposerThreadDraft(composerDraftTarget);
+  const setReviewComments = useComposerDraftStore((store) => store.setReviewComments);
 
   const routeThreadRef = useParams({
     strict: false,
@@ -274,6 +284,9 @@ export default function DiffPanel({
   const selectedTurnId = diffSelection.kind === "turn" ? diffSelection.turnId : null;
   const selectedGitScope = diffSelection.kind === "unstaged" ? "unstaged" : "branch";
   const selectedBaseRef = diffSelection.kind === "branch" ? diffSelection.baseRef : null;
+  const currentPullRequest = gitStatusQuery.data?.pr;
+  const comparisonBaseRef =
+    selectedBaseRef ?? (currentPullRequest?.state === "open" ? currentPullRequest.baseRef : null);
   const selectedFilePath = diffSelection.kind === "turn" ? diffSelection.filePath : null;
   const selectedFileRevealRequestId =
     diffSelection.kind === "turn" ? diffSelection.revealRequestId : 0;
@@ -334,7 +347,7 @@ export default function DiffPanel({
           environmentId: activeThread.environmentId,
           input: {
             cwd: activeCwd,
-            ...(selectedBaseRef ? { baseRef: selectedBaseRef } : {}),
+            ...(comparisonBaseRef ? { baseRef: comparisonBaseRef } : {}),
             ignoreWhitespace: diffIgnoreWhitespace,
           },
         })
@@ -351,7 +364,7 @@ export default function DiffPanel({
           environmentId: activeThread.environmentId,
           input: {
             cwd: serverConfig.cwd,
-            ...(selectedBaseRef ? { baseRef: selectedBaseRef } : {}),
+            ...(comparisonBaseRef ? { baseRef: comparisonBaseRef } : {}),
             ignoreWhitespace: diffIgnoreWhitespace,
           },
         })
@@ -452,6 +465,10 @@ export default function DiffPanel({
       }),
     [collapsedDiffFileKeys, renderableFiles],
   );
+  const pullRequestReviewComments = useMemo(
+    () => buildPullRequestReviewComments(composerDraft.reviewComments, codeViewFiles),
+    [codeViewFiles, composerDraft.reviewComments],
+  );
   const diffFileKeys = useMemo(() => codeViewFiles.map((file) => file.fileKey), [codeViewFiles]);
   const allDiffFilesCollapsed = areAllDiffFilesCollapsed(diffFileKeys, collapsedDiffFileKeys);
   const diffLineStat = useMemo(() => getDiffLineStat(renderableFiles), [renderableFiles]);
@@ -462,6 +479,16 @@ export default function DiffPanel({
     if (!file) return;
     codeViewRef.current?.scrollTo({ type: "item", id: file.fileKey, align: "start" });
   }, [codeViewFiles, selectedFilePath, selectedFileRevealRequestId]);
+
+  useEffect(() => {
+    if (reviewView !== "diff" || requestedReviewFileKey === null) return;
+    codeViewRef.current?.scrollTo({
+      type: "item",
+      id: requestedReviewFileKey,
+      align: "start",
+    });
+    setRequestedReviewFileKey(null);
+  }, [requestedReviewFileKey, reviewView]);
 
   const openDiffFile = useCallback(
     (filePath: string) => {
@@ -724,6 +751,43 @@ export default function DiffPanel({
             layout="inline"
           />
         )}
+        {selectedTurnId === null &&
+        selectedGitScope === "branch" &&
+        gitStatusQuery.data?.sourceControlProvider?.kind === "github" &&
+        currentPullRequest?.state === "open" &&
+        selectedGitSource?.baseRef === currentPullRequest.baseRef ? (
+          <Button
+            type="button"
+            size="xs"
+            variant="outline"
+            onClick={() => setReviewDialogOpen(true)}
+          >
+            <GitPullRequestIcon className="size-3" />
+            Review PR
+            {pullRequestReviewComments.comments.length > 0
+              ? ` (${pullRequestReviewComments.comments.length})`
+              : ""}
+          </Button>
+        ) : null}
+        {codeViewFiles.length > 0 ? (
+          <ToggleGroup
+            className="shrink-0"
+            variant="outline"
+            size="xs"
+            value={[reviewView]}
+            onValueChange={(value) => {
+              const next = value[0];
+              if (next === "diff" || next === "guided") setReviewView(next);
+            }}
+          >
+            <Toggle aria-label="Code diff" value="diff">
+              <FileCodeIcon className="size-3" />
+            </Toggle>
+            <Toggle aria-label="Guided review overview" value="guided">
+              <ListTreeIcon className="size-3" />
+            </Toggle>
+          </ToggleGroup>
+        ) : null}
         {codeViewFiles.length > 0 && (
           <Tooltip>
             <TooltipTrigger
@@ -815,6 +879,25 @@ export default function DiffPanel({
 
   return (
     <DiffPanelShell mode={mode} header={headerRow}>
+      {activeThread && activeCwd && currentPullRequest?.state === "open" ? (
+        <PullRequestReviewDialog
+          open={reviewDialogOpen}
+          environmentId={activeThread.environmentId}
+          cwd={activeCwd}
+          pullRequest={currentPullRequest}
+          comments={pullRequestReviewComments.comments}
+          skippedCommentCount={pullRequestReviewComments.skippedCount}
+          onOpenChange={setReviewDialogOpen}
+          onSubmitted={() => {
+            setReviewComments(
+              composerDraftTarget,
+              composerDraft.reviewComments.filter(
+                (comment) => !pullRequestReviewComments.includedCommentIds.has(comment.id),
+              ),
+            );
+          }}
+        />
+      ) : null}
       {!activeThread ? (
         <div className="flex flex-1 items-center justify-center px-5 text-center text-xs text-muted-foreground/70">
           Select a thread to inspect turn diffs.
@@ -861,6 +944,71 @@ export default function DiffPanel({
                   </p>
                 </div>
               )
+            ) : renderablePatch.kind === "files" && reviewView === "guided" ? (
+              <div className="min-h-0 flex-1 overflow-y-auto p-3">
+                <div className="mx-auto grid w-full max-w-3xl gap-2">
+                  <div className="mb-1 px-1">
+                    <h2 className="text-sm font-semibold">Review overview</h2>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {codeViewFiles.length} code {codeViewFiles.length === 1 ? "chunk" : "chunks"},
+                      ordered by file path. Open each chunk to review and comment on its lines.
+                    </p>
+                  </div>
+                  {codeViewFiles.map(({ fileDiff, filePath, fileKey }) => {
+                    const lineStat = getDiffLineStat([fileDiff]);
+                    const description =
+                      fileDiff.type === "new"
+                        ? "Introduces a new file. Check its behavior and integration points."
+                        : fileDiff.type === "deleted"
+                          ? "Removes a file. Check callers and replacement behavior."
+                          : fileDiff.type === "rename-pure"
+                            ? "Moves a file without code changes. Check references and paths."
+                            : fileDiff.type === "rename-changed"
+                              ? "Moves and changes a file. Review both references and behavior."
+                              : "Changes existing behavior. Review the affected paths and edge cases.";
+                    return (
+                      <article
+                        key={fileKey}
+                        className="rounded-xl border border-border/70 bg-card px-3.5 py-3 shadow-xs"
+                      >
+                        <div className="flex min-w-0 items-start gap-3">
+                          <span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-border/70 bg-muted/35">
+                            <FileCodeIcon className="size-3.5 text-muted-foreground" />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <h3 className="truncate font-mono text-xs font-medium" title={filePath}>
+                              {filePath}
+                            </h3>
+                            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                              {description} {fileDiff.hunks.length} change
+                              {fileDiff.hunks.length === 1 ? " section" : " sections"}.
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-2">
+                            <DiffStatLabel
+                              additions={lineStat.additions}
+                              deletions={lineStat.deletions}
+                              className="text-[11px]"
+                              layout="inline"
+                            />
+                            <Button
+                              type="button"
+                              size="xs"
+                              variant="outline"
+                              onClick={() => {
+                                setRequestedReviewFileKey(fileKey);
+                                setReviewView("diff");
+                              }}
+                            >
+                              Review
+                            </Button>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </div>
             ) : renderablePatch.kind === "files" ? (
               <div
                 className="min-h-0 flex-1"

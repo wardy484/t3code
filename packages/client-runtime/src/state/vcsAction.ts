@@ -37,6 +37,7 @@ export const VcsActionOperation = Schema.Literals([
   "init",
   "publish_repository",
   "prepare_pull_request_thread",
+  "submit_pull_request_review",
 ]);
 export type VcsActionOperation = typeof VcsActionOperation.Type;
 

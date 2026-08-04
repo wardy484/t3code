@@ -10,6 +10,7 @@ import {
 } from "@t3tools/client-runtime/state/vcs";
 import type {
   EnvironmentId,
+  GitSubmitPullRequestReviewInput,
   GitActionProgressEvent,
   GitResolvePullRequestResult,
   GitStackedAction,
@@ -34,7 +35,8 @@ export type SourceControlActionKind =
   | "pull"
   | "publishRepository"
   | "runStackedAction"
-  | "preparePullRequestThread";
+  | "preparePullRequestThread"
+  | "submitPullRequestReview";
 
 export interface SourceControlActionScope {
   readonly environmentId: EnvironmentId | null;
@@ -61,6 +63,7 @@ const ACTION_OPERATION = {
   publishRepository: "publish_repository",
   runStackedAction: "run_change_request",
   preparePullRequestThread: "prepare_pull_request_thread",
+  submitPullRequestReview: "submit_pull_request_review",
 } as const satisfies Record<SourceControlActionKind, VcsActionOperation>;
 
 function useAction<
@@ -337,6 +340,39 @@ export function usePreparePullRequestThreadAction(scope: SourceControlActionScop
   return useAction({
     kind: "preparePullRequestThread",
     label: "Preparing pull request thread",
+    scope,
+    action,
+  });
+}
+
+export function useSubmitPullRequestReviewAction(scope: SourceControlActionScope) {
+  const submitPullRequestReview = useAtomCommand(gitEnvironment.submitPullRequestReview, {
+    reportFailure: false,
+  });
+  const action = useCallback(
+    async (input: Omit<GitSubmitPullRequestReviewInput, "cwd">) => {
+      const target = resolveScope(scope);
+      if (target === null) {
+        return AsyncResult.failure<never, VcsActionUnavailableError>(
+          Cause.fail(
+            new VcsActionUnavailableError({
+              operation: "submit_pull_request_review",
+              environmentId: scope.environmentId,
+              cwd: scope.cwd,
+            }),
+          ),
+        );
+      }
+      return submitPullRequestReview({
+        environmentId: target.environmentId,
+        input: { cwd: target.cwd, ...input },
+      });
+    },
+    [scope, submitPullRequestReview],
+  );
+  return useAction({
+    kind: "submitPullRequestReview",
+    label: "Submitting pull request review",
     scope,
     action,
   });
