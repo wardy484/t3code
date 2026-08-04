@@ -14,6 +14,7 @@ import {
   RefreshCwIcon,
   Trash2Icon,
 } from "lucide-react";
+import * as Option from "effect/Option";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
@@ -30,6 +31,7 @@ import {
 } from "../../kanban";
 import { useActiveEnvironmentId, useProjects } from "../../state/entities";
 import { useEnvironments, usePrimaryEnvironmentId } from "../../state/environments";
+import { usePreparedConnection } from "../../state/session";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
 import { Input } from "../ui/input";
@@ -160,6 +162,9 @@ export function IntegrationsSettings() {
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const preparedConnection = usePreparedConnection(environmentId);
+  const environmentConnected =
+    environmentId === primaryEnvironmentId || Option.isSome(preparedConnection);
 
   const projects = useMemo(
     () => allProjects.filter((project) => project.environmentId === environmentId),
@@ -183,7 +188,7 @@ export function IntegrationsSettings() {
   }, [activeEnvironmentId, environmentId, environments, primaryEnvironmentId]);
 
   const loadCatalog = useCallback(async () => {
-    if (!environmentId) {
+    if (!environmentId || !environmentConnected) {
       setOrganizations([]);
       setBoards([]);
       return;
@@ -200,7 +205,7 @@ export function IntegrationsSettings() {
     } finally {
       setLoading(false);
     }
-  }, [environmentId]);
+  }, [environmentConnected, environmentId]);
 
   useEffect(() => {
     setNativeOrganizationId(null);
@@ -302,7 +307,7 @@ export function IntegrationsSettings() {
               aria-label="Organisation name"
             />
             <Button
-              disabled={busy || !environmentId || !organizationName.trim()}
+              disabled={busy || !environmentId || !environmentConnected || !organizationName.trim()}
               onClick={createOrganization}
             >
               <PlusIcon className="size-3.5" />

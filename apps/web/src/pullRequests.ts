@@ -37,7 +37,7 @@ export function mergeProjectPullRequests(
     for (const pullRequest of source.pullRequests) {
       if (!merged.has(pullRequest.url)) {
         merged.set(pullRequest.url, {
-          project: matchPullRequestProject(pullRequest, projects),
+          project: matchPullRequestProject(pullRequest, projects, source.project.environmentId),
           pullRequest,
         });
       }
@@ -51,11 +51,18 @@ export function mergeProjectPullRequests(
 function matchPullRequestProject(
   pullRequest: RelevantChangeRequest,
   projects: ReadonlyArray<EnvironmentProject>,
+  sourceEnvironmentId: EnvironmentProject["environmentId"],
 ): EnvironmentProject | null {
   const repository = pullRequest.repositoryNameWithOwner.toLowerCase();
   const exactMatches = projects.filter((project) =>
     project.repositoryIdentity?.canonicalKey.toLowerCase().endsWith(`github.com/${repository}`),
   );
+  const sourceEnvironmentExactMatches = exactMatches.filter(
+    (project) => project.environmentId === sourceEnvironmentId,
+  );
+  if (sourceEnvironmentExactMatches.length === 1) {
+    return sourceEnvironmentExactMatches[0] ?? null;
+  }
   if (exactMatches.length === 1) return exactMatches[0] ?? null;
 
   const repositoryName = repository.split("/").at(-1);
@@ -63,6 +70,12 @@ function matchPullRequestProject(
     const canonicalKey = project.repositoryIdentity?.canonicalKey.toLowerCase();
     return canonicalKey?.split("/").at(-1) === repositoryName;
   });
+  const sourceEnvironmentNameMatches = nameMatches.filter(
+    (project) => project.environmentId === sourceEnvironmentId,
+  );
+  if (sourceEnvironmentNameMatches.length === 1) {
+    return sourceEnvironmentNameMatches[0] ?? null;
+  }
   return nameMatches.length === 1 ? (nameMatches[0] ?? null) : null;
 }
 

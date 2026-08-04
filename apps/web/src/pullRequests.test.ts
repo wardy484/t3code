@@ -13,12 +13,13 @@ import {
 function project(input: {
   id: string;
   workspaceRoot: string;
+  environmentId?: string;
   canonicalKey?: string;
   rootPath?: string;
 }): EnvironmentProject {
   return {
     id: input.id,
-    environmentId: "env-1",
+    environmentId: input.environmentId ?? "env-1",
     title: input.id,
     workspaceRoot: input.workspaceRoot,
     repositoryIdentity: input.canonicalKey
@@ -131,6 +132,33 @@ describe("pull request inbox", () => {
     expect(items.find((item) => item.pullRequest.url === unrelatedPullRequest.url)?.project).toBe(
       null,
     );
+  });
+
+  it("maps a PR to the matching project in the environment that returned it", () => {
+    const localProject = project({
+      id: "tutora-local",
+      environmentId: "env-local",
+      workspaceRoot: "/Users/kim/code/tutora",
+      canonicalKey: "github.com/TutoraUK/tutora",
+    });
+    const remoteProject = project({
+      id: "tutora-remote",
+      environmentId: "env-remote",
+      workspaceRoot: "/root/code/tutorful/tutora",
+      canonicalKey: "github.com/TutoraUK/tutora",
+    });
+    const tutoraPullRequest = {
+      ...pullRequest,
+      url: "https://github.com/TutoraUK/tutora/pull/10677",
+      repositoryNameWithOwner: "TutoraUK/tutora",
+    };
+
+    const [item] = mergeProjectPullRequests(
+      [{ project: remoteProject, pullRequests: [tutoraPullRequest] }],
+      [localProject, remoteProject],
+    );
+
+    expect(item?.project).toBe(remoteProject);
   });
 
   it("uses the show-me skill when available and a plain prompt otherwise", () => {
