@@ -110,6 +110,8 @@ import {
 import { orchestrationHttpApiLayer } from "./orchestration/http.ts";
 import * as JiraService from "./jira/JiraService.ts";
 import { jiraHttpApiLayer } from "./jira/http.ts";
+import * as KanbanService from "./kanban/KanbanService.ts";
+import { kanbanHttpApiLayer } from "./kanban/http.ts";
 import * as NetService from "@t3tools/shared/Net";
 import * as RelayClient from "@t3tools/shared/relayClient";
 import { disableTailscaleServe, ensureTailscaleServe } from "@t3tools/tailscale";
@@ -330,6 +332,11 @@ const AuthLayerLive = EnvironmentAuth.layer.pipe(
   Layer.provide(ServerSecretStore.layer),
 );
 
+const KanbanServiceLayerLive = KanbanService.layer.pipe(
+  Layer.provide(JiraService.layer),
+  Layer.provide(PersistenceLayerLive),
+);
+
 const CloudManagedEndpointRuntimeLive = Layer.mergeAll(
   RelayClientLive,
   CloudManagedEndpointRuntime.layer.pipe(
@@ -381,6 +388,7 @@ const RuntimeCoreDependenciesLive = ReactorLayerLive.pipe(
   Layer.provideMerge(ServerSecretStore.layer),
   Layer.provideMerge(
     Layer.mergeAll(
+      KanbanServiceLayerLive.pipe(Layer.provide(ServerSecretStore.layer)),
       CloudCliTokenManager.layer.pipe(
         Layer.provide(ServerSecretStore.layer),
         Layer.provide(ExternalLauncher.layer),
@@ -416,6 +424,7 @@ export const makeRoutesLayer = Layer.mergeAll(
       Layer.provide(connectHttpApiLayer),
       Layer.provide(orchestrationHttpApiLayer),
       Layer.provide(jiraHttpApiLayer.pipe(Layer.provide(JiraService.layer))),
+      Layer.provide(kanbanHttpApiLayer),
       Layer.provide(serverEnvironmentHttpApiLayer),
       Layer.provide(environmentAuthenticatedAuthLayer),
     ),

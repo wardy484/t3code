@@ -43,6 +43,7 @@ const JiraConfigFile = Schema.Struct({
   baseBranch: TrimmedNonEmptyString,
 });
 type JiraConfig = typeof JiraConfigFile.Type & { readonly apiToken: string };
+export type JiraRuntimeConfig = JiraConfig;
 
 const JiraAdfNode = Schema.Struct({
   type: Schema.String,
@@ -222,6 +223,21 @@ export class JiraService extends Context.Service<
       input: JiraAssignIssueInput,
     ) => Effect.Effect<JiraAssignIssueResult, JiraServiceError>;
     readonly lookupIssues: (
+      input: JiraLookupIssuesInput,
+    ) => Effect.Effect<JiraLookupIssuesResult, JiraServiceError>;
+    readonly getBoardForConfig: (
+      config: JiraRuntimeConfig,
+    ) => Effect.Effect<JiraBoard, JiraServiceError>;
+    readonly transitionIssueForConfig: (
+      config: JiraRuntimeConfig,
+      input: JiraTransitionIssueInput,
+    ) => Effect.Effect<JiraTransitionIssueResult, JiraServiceError>;
+    readonly assignIssueForConfig: (
+      config: JiraRuntimeConfig,
+      input: JiraAssignIssueInput,
+    ) => Effect.Effect<JiraAssignIssueResult, JiraServiceError>;
+    readonly lookupIssuesForConfig: (
+      config: JiraRuntimeConfig,
       input: JiraLookupIssuesInput,
     ) => Effect.Effect<JiraLookupIssuesResult, JiraServiceError>;
   }
@@ -624,8 +640,9 @@ export const layer = Layer.effect(
       return { disconnected: true } satisfies JiraDisconnectResult;
     });
 
-    const getBoard = Effect.fn("JiraService.getBoard")(function* () {
-      const config = yield* loadConfig();
+    const getBoardForConfig = Effect.fn("JiraService.getBoardForConfig")(function* (
+      config: JiraRuntimeConfig,
+    ) {
       const [jiraBoard, boardDetails, currentUser] = yield* Effect.all(
         [loadBoardConfiguration(config), loadBoardDetails(config), loadCurrentUser(config)],
         { concurrency: "unbounded" },
@@ -669,10 +686,14 @@ export const layer = Layer.effect(
       } satisfies JiraBoard;
     });
 
-    const transitionIssue = Effect.fn("JiraService.transitionIssue")(function* (
+    const getBoard = Effect.fn("JiraService.getBoard")(function* () {
+      return yield* getBoardForConfig(yield* loadConfig());
+    });
+
+    const transitionIssueForConfig = Effect.fn("JiraService.transitionIssueForConfig")(function* (
+      config: JiraRuntimeConfig,
       input: JiraTransitionIssueInput,
     ) {
-      const config = yield* loadConfig();
       const jiraBoard = yield* loadBoardConfiguration(config);
       const columns = boardColumns(jiraBoard);
       const targetColumn = columns.find((column) => column.id === input.targetColumnId);
@@ -713,10 +734,16 @@ export const layer = Layer.effect(
       } satisfies JiraTransitionIssueResult;
     });
 
-    const assignIssue = Effect.fn("JiraService.assignIssue")(function* (
+    const transitionIssue = Effect.fn("JiraService.transitionIssue")(function* (
+      input: JiraTransitionIssueInput,
+    ) {
+      return yield* transitionIssueForConfig(yield* loadConfig(), input);
+    });
+
+    const assignIssueForConfig = Effect.fn("JiraService.assignIssueForConfig")(function* (
+      config: JiraRuntimeConfig,
       input: JiraAssignIssueInput,
     ) {
-      const config = yield* loadConfig();
       const currentUser = yield* loadCurrentUser(config);
       const baseUrl = normalizedBaseUrl(config.baseUrl);
       const configuredClient = jiraClient(client, config);
@@ -740,10 +767,16 @@ export const layer = Layer.effect(
       } satisfies JiraAssignIssueResult;
     });
 
-    const lookupIssues = Effect.fn("JiraService.lookupIssues")(function* (
+    const assignIssue = Effect.fn("JiraService.assignIssue")(function* (
+      input: JiraAssignIssueInput,
+    ) {
+      return yield* assignIssueForConfig(yield* loadConfig(), input);
+    });
+
+    const lookupIssuesForConfig = Effect.fn("JiraService.lookupIssuesForConfig")(function* (
+      config: JiraRuntimeConfig,
       input: JiraLookupIssuesInput,
     ) {
-      const config = yield* loadConfig();
       const issueKeys = [...new Set(input.issueKeys.map((key) => key.trim().toUpperCase()))];
       const jqlKeys = issueKeys.map((key) => `"${key.replaceAll('"', '\\"')}"`).join(", ");
       const issues = yield* loadIssues(config, `key in (${jqlKeys}) ORDER BY updated DESC`);
@@ -751,6 +784,12 @@ export const layer = Layer.effect(
       return {
         issues: issues.map((issue) => boardIssue(baseUrl, issue)),
       } satisfies JiraLookupIssuesResult;
+    });
+
+    const lookupIssues = Effect.fn("JiraService.lookupIssues")(function* (
+      input: JiraLookupIssuesInput,
+    ) {
+      return yield* lookupIssuesForConfig(yield* loadConfig(), input);
     });
 
     return JiraService.of({
@@ -762,6 +801,10 @@ export const layer = Layer.effect(
       transitionIssue,
       assignIssue,
       lookupIssues,
+      getBoardForConfig,
+      transitionIssueForConfig,
+      assignIssueForConfig,
+      lookupIssuesForConfig,
     });
   }),
 );

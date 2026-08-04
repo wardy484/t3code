@@ -15,8 +15,7 @@ import {
   type ThreadId,
   type TurnId,
   type KeybindingCommand,
-  type JiraBoardIssue,
-  type JiraIntegrationConfiguration,
+  type KanbanProjectCard,
   OrchestrationThreadActivity,
   ProviderInteractionMode,
   ProviderDriverKind,
@@ -143,7 +142,8 @@ import {
 import { RightPanelTabs } from "./RightPanelTabs";
 import { JiraTicketsPanel } from "./JiraTicketsPanel";
 import { deriveJiraTicketRelationships, extractJiraIssueKeys } from "../jiraThreadTickets";
-import { assignJiraIssue, buildJiraTicketPrompt, shouldAssignJiraTicket } from "../jira";
+import { buildJiraTicketPrompt } from "../jira";
+import { assignKanbanCard } from "../kanban";
 import { DiffWorkerPoolProvider } from "./DiffWorkerPoolProvider";
 import { BranchToolbar } from "./BranchToolbar";
 import { resolveShortcutCommand, shortcutLabelForCommand } from "../keybindings";
@@ -3161,39 +3161,33 @@ function ChatViewContent(props: ChatViewProps) {
     useRightPanelStore.getState().open(activeThreadRef, "tickets");
   }, [activeThreadRef, jiraIssueKeys.length]);
   const startJiraTicketWork = useCallback(
-    async (issue: JiraBoardIssue, configuration: JiraIntegrationConfiguration) => {
-      if (!activeThread || !isServerThread || !primaryEnvironmentId) {
+    async ({ board, card }: KanbanProjectCard) => {
+      if (!activeThread || !isServerThread || !activeProject) {
         throw new Error("Jira work can only be started from a saved thread.");
       }
-      if (activeThread.environmentId !== primaryEnvironmentId) {
-        throw new Error("Jira work must be started from the primary T3 environment.");
-      }
-      const project = allProjects.find(
-        (candidate) =>
-          candidate.environmentId === primaryEnvironmentId &&
-          candidate.workspaceRoot === configuration.projectPath,
-      );
-      if (!project) {
-        throw new Error("The Jira integration's T3 project is no longer available.");
+      if (!card.url) {
+        throw new Error("This Jira ticket does not have a URL.");
       }
 
-      let ticket = issue;
-      if (shouldAssignJiraTicket(issue, "work")) {
-        const assignment = await assignJiraIssue({ issueKey: issue.key });
-        ticket = { ...issue, assignee: assignment.assignee };
+      let ticket = card;
+      if (card.assignee === null) {
+        ticket = await assignKanbanCard(activeThread.environmentId, {
+          boardId: board.id,
+          cardId: card.id,
+        });
       }
 
       const workThreadId = newThreadId();
       const createdAt = new Date().toISOString();
-      const title = truncate(`${issue.key}: ${issue.summary}`);
+      const title = truncate(`${card.key}: ${card.summary}`);
       const result = await startThreadTurn({
-        environmentId: primaryEnvironmentId,
+        environmentId: activeThread.environmentId,
         input: {
           threadId: workThreadId,
           message: {
             messageId: newMessageId(),
             role: "user",
-            text: buildJiraTicketPrompt(ticket, "work"),
+            text: buildJiraTicketPrompt({ ...ticket, url: card.url }, "work"),
             attachments: [],
           },
           modelSelection: activeThread.modelSelection,
@@ -3202,24 +3196,24 @@ function ChatViewContent(props: ChatViewProps) {
           interactionMode: activeThread.interactionMode,
           sourceJiraTicket: {
             sourceThreadId: activeThread.id,
-            issueKey: issue.key,
-            issueSummary: issue.summary,
-            issueUrl: issue.url,
+            issueKey: card.key,
+            issueSummary: card.summary,
+            issueUrl: card.url,
           },
           bootstrap: {
             createThread: {
-              projectId: project.id,
+              projectId: activeProject.id,
               title,
               modelSelection: activeThread.modelSelection,
               runtimeMode: activeThread.runtimeMode,
               interactionMode: activeThread.interactionMode,
-              branch: configuration.baseBranch,
+              branch: board.baseBranch,
               worktreePath: null,
               createdAt,
             },
             prepareWorktree: {
-              projectCwd: project.workspaceRoot,
-              baseBranch: configuration.baseBranch,
+              projectCwd: activeProject.workspaceRoot,
+              baseBranch: board.baseBranch,
               branch: buildTemporaryWorktreeBranchName(randomHex),
             },
             runSetupScript: true,
@@ -3232,17 +3226,17 @@ function ChatViewContent(props: ChatViewProps) {
       }
       return workThreadId;
     },
-    [activeThread, allProjects, isServerThread, primaryEnvironmentId, startThreadTurn],
+    [activeProject, activeThread, isServerThread, startThreadTurn],
   );
   const openJiraWorkThread = useCallback(
     (workThreadId: ThreadId) => {
-      if (!primaryEnvironmentId) return;
+      if (!activeThread) return;
       void navigate({
         to: "/$environmentId/$threadId",
-        params: { environmentId: primaryEnvironmentId, threadId: workThreadId },
+        params: { environmentId: activeThread.environmentId, threadId: workThreadId },
       });
     },
-    [navigate, primaryEnvironmentId],
+    [activeThread, navigate],
   );
   const openFileSurface = useCallback(
     (relativePath: string) => {
@@ -5815,8 +5809,10 @@ function ChatViewContent(props: ChatViewProps) {
         timestampFormat={timestampFormat}
         mode="embedded"
       />
-    ) : activeRightPanelSurface?.kind === "tickets" ? (
+    ) : activeRightPanelSurface?.kind === "tickets" && activeProject ? (
       <JiraTicketsPanel
+        environmentId={activeProject.environmentId}
+        projectId={activeProject.id}
         issueKeys={jiraIssueKeys}
         relationships={jiraTicketRelationships}
         onStartWork={startJiraTicketWork}
