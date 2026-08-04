@@ -1,33 +1,87 @@
-# Jira Tickets
+# Boards and Jira
 
-T3 Code can show a Jira Cloud board beside your threads. The board supports filtering by assignee
-or Epic, moving issues through available Jira workflow transitions, and starting an agent thread
-from a ticket.
+T3 Code boards keep work separated by organisation and project. An organisation owns boards, a
+project belongs to one organisation, and each board is explicitly assigned to the projects where
+it should appear. A ticket from one organisation therefore cannot appear in an unrelated project.
 
-## Connect Jira
+Boards can be native T3 boards or Jira Cloud boards. Both support moving cards and starting agent
+threads from work. Native boards also support creating and deleting cards in T3 Code.
 
-Open **Settings → Integrations → Jira** on a client connected to the environment that will host the
-integration.
+## Where boards live
 
-1. Enter the Jira site URL, account email, and an API token.
-2. Select **Test connection**, then choose an available board.
-3. Choose the T3 project and base branch used by **Start**.
-4. Optionally enter JQL to narrow the selected board's saved filter.
-5. Select **Save**.
+Organisations and boards are stored by the T3 environment selected under **Settings →
+Integrations**. This works for local and remote environments: the machine running that T3 server
+owns the data and credentials, while connected web, desktop, and mobile clients use the same
+server-side catalogue.
 
-The API token is stored in the environment's protected server-side secret store. Clients can see
-that a token is present but cannot read it back. Reopen the integration to change its configuration,
-replace the token, test the connection, or disconnect Jira.
+Organisations do not currently span environments. Create an organisation separately on each server
+that should host it.
 
-The token needs permission to browse the configured board and issues. Starting an unassigned ticket
-requires **Assign issues**, and moving cards requires **Transition issues**.
+## Set up organisations and projects
 
-## Manual configuration
+1. Open **Settings → Integrations** and select the environment that will host the boards.
+2. Create an organisation, such as `T3 Code` or `Tutorful`.
+3. Select the projects that belong to it.
 
-For headless installations, Jira can also be configured directly on the server.
+A project can belong to only one organisation. Moving it to another organisation removes its old
+board assignments, which prevents cards from the old organisation continuing to appear there.
 
-Create `jira.json` in the T3 Code userdata directory on the machine running the server. For a normal
-installation, this is `~/.t3/userdata/jira.json`:
+## Add a T3 board
+
+Under **T3 boards**, choose an organisation, name the board, select its projects, and choose the
+base branch used by **Start**. New boards contain **Todo**, **In Progress**, and **Done** columns.
+
+Open **Boards** from the sidebar to create cards, drag them between columns, delete them, or start a
+worktree thread from a card.
+
+## Add a Jira board
+
+Under **Jira boards**:
+
+1. Choose the organisation that owns the Jira connection.
+2. Enter the Jira site URL, account email, and API token.
+3. Load the available Jira boards and select one.
+4. Select exactly which organisation projects can use the board.
+5. Choose the base branch and, optionally, a JQL override.
+6. Add the board.
+
+The API token is stored in that environment's protected server-side secret store and is shared by
+the Jira boards in the organisation. An organisation connects to one Jira site and account, but can
+contain multiple boards from that connection. The token is never returned to clients. It needs
+permission to browse the configured boards and issues. Starting unassigned work requires **Assign
+issues**, and moving cards requires **Transition issues**.
+
+Leave JQL blank to load an active sprint when available, falling back to the board's saved filter.
+Provide JQL to override that behavior. T3 Code loads up to 500 matching issues per board.
+
+## Start work from a card
+
+Select **Start** on a card. Jira cards are assigned to the Jira account first when they are
+unassigned. T3 Code then creates a worktree in the selected project using the board's base branch
+and fills the first prompt with the card details.
+
+Jira cards in Review offer **Review** and create a review-focused thread. Done columns do not offer
+a thread action. Jira branch and pull request titles follow these conventions:
+
+```text
+branch: KG-3345-title-of-ticket
+PR title: [KG-3345] Title of Ticket
+```
+
+## Tickets surfaced in a thread
+
+On web and desktop, Jira keys mentioned by an agent appear in that thread's **Tickets** panel only
+when the Jira board is assigned to the thread's exact environment and project. The panel can start
+work or reopen an existing related thread without querying boards from another project.
+
+## Existing Jira configuration
+
+An existing single-board `jira.json` configuration is imported automatically the first time the
+new board catalogue loads. T3 Code creates an organisation for the Jira site, imports its board,
+and assigns the project matching `projectPath`. The existing protected token is reused.
+
+Headless installations can still provide the legacy file at `~/.t3/userdata/jira.json` and the Jira
+token through `T3CODE_JIRA_API_TOKEN` before that first import:
 
 ```json
 {
@@ -39,55 +93,3 @@ installation, this is `~/.t3/userdata/jira.json`:
   "baseBranch": "main"
 }
 ```
-
-Set the Jira Cloud API token in the server process environment, then restart T3 Code:
-
-```bash
-export T3CODE_JIRA_API_TOKEN="your-api-token"
-```
-
-The token stays on the server and is never sent to T3 Code clients. Settings-managed credentials
-take precedence over this environment variable.
-
-When both settings are available, **Tickets** appears below Search in the sidebar.
-
-## Start work from a ticket
-
-Select **Start** on a card. If the ticket is unassigned, T3 Code assigns it to the Jira account that
-owns the API token. It then opens a new worktree draft for `projectPath`, using `baseBranch` as its
-starting point, and fills the composer with the issue summary, description, and Jira link.
-
-Tickets in Review use **Review** to start a review-focused thread. Done columns do not offer a
-thread action.
-
-The worktree branch and pull request title follow these conventions:
-
-```text
-branch: KG-3345-title-of-ticket
-PR title: [KG-3345] Title of Ticket
-```
-
-The draft is left ready for review before you send it to the agent.
-
-## Tickets surfaced in a thread
-
-On web and desktop, Jira ticket keys mentioned by an agent appear as cards in that thread's
-**Tickets** right panel. Each card shows the current Jira title and status and links back to Jira.
-The cards stay in the panel rather than appearing as extra messages in the conversation.
-
-Select **Start work** to assign an unassigned ticket to your Jira account, create a worktree thread
-with the ticket description and delivery conventions, and start its first turn immediately. The
-action changes to **Open thread** once work starts. T3 Code records the source thread, ticket, and
-work thread together and rejects duplicate starts for the same ticket.
-
-The source agent is not interrupted. On its next turn, it receives private context telling it that
-work has already started and which ticket is being handled, so it does not duplicate the work.
-
-## Notes
-
-- The board columns come from the configured Jira board. Leave JQL blank to load active sprint
-  issues when available, falling back to the board's saved filter. Provide JQL to override this.
-- **My work** compares each issue with the Jira account that owns the API token.
-- Epic filtering uses Jira's parent relationship.
-- Dragging a card only works when Jira offers a workflow transition into the target column.
-- T3 Code loads up to 500 matching issues to keep the board responsive.

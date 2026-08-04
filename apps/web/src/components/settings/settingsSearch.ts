@@ -144,8 +144,18 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/source-control",
   },
   {
-    id: "jira-integration",
-    title: "Jira",
+    id: "boards-organizations",
+    title: "Board organisations",
+    to: "/settings/integrations",
+  },
+  {
+    id: "native-boards",
+    title: "T3 boards",
+    to: "/settings/integrations",
+  },
+  {
+    id: "jira-boards",
+    title: "Jira boards",
     to: "/settings/integrations",
   },
   {

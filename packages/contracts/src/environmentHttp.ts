@@ -56,6 +56,30 @@ import {
   JiraTransitionIssueInput,
   JiraTransitionIssueResult,
 } from "./jira.ts";
+import {
+  KanbanAssignCardInput,
+  KanbanBoard,
+  KanbanBoardInput,
+  KanbanBoardSummary,
+  KanbanCard,
+  KanbanCatalog,
+  KanbanCreateCardInput,
+  KanbanCreateJiraBoardInput,
+  KanbanCreateNativeBoardInput,
+  KanbanCreateOrganizationInput,
+  KanbanDeleteCardInput,
+  KanbanDeleteOrganizationInput,
+  KanbanDeleteResult,
+  KanbanMoveCardInput,
+  KanbanLookupProjectCardsInput,
+  KanbanLookupProjectCardsResult,
+  KanbanOrganization,
+  KanbanProjectBoards,
+  KanbanProjectBoardsInput,
+  KanbanUpdateBoardInput,
+  KanbanUpdateCardInput,
+  KanbanUpdateOrganizationInput,
+} from "./kanban.ts";
 
 const OptionalBearerHeaders = Schema.Struct({
   authorization: Schema.optionalKey(Schema.String),
@@ -566,6 +590,135 @@ export class EnvironmentJiraHttpApi extends HttpApiGroup.make("jira")
     }).middleware(EnvironmentAuthenticatedAuth),
   ) {}
 
+export class EnvironmentKanbanHttpApi extends HttpApiGroup.make("kanban")
+  .add(
+    HttpApiEndpoint.get("catalog", "/api/kanban/catalog", {
+      headers: OptionalBearerHeaders,
+      success: KanbanCatalog,
+      error: EnvironmentOrchestrationSnapshotErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("createOrganization", "/api/kanban/organizations", {
+      headers: OptionalBearerHeaders,
+      payload: KanbanCreateOrganizationInput,
+      success: KanbanOrganization,
+      error: EnvironmentOrchestrationDispatchErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("updateOrganization", "/api/kanban/organizations/update", {
+      headers: OptionalBearerHeaders,
+      payload: KanbanUpdateOrganizationInput,
+      success: KanbanOrganization,
+      error: EnvironmentOrchestrationDispatchErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("deleteOrganization", "/api/kanban/organizations/delete", {
+      headers: OptionalBearerHeaders,
+      payload: KanbanDeleteOrganizationInput,
+      success: KanbanDeleteResult,
+      error: EnvironmentOrchestrationDispatchErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("createNativeBoard", "/api/kanban/boards/native", {
+      headers: OptionalBearerHeaders,
+      payload: KanbanCreateNativeBoardInput,
+      success: KanbanBoardSummary,
+      error: EnvironmentOrchestrationDispatchErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("createJiraBoard", "/api/kanban/boards/jira", {
+      headers: OptionalBearerHeaders,
+      payload: KanbanCreateJiraBoardInput,
+      success: KanbanBoardSummary,
+      error: EnvironmentOrchestrationDispatchErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("updateBoard", "/api/kanban/boards/update", {
+      headers: OptionalBearerHeaders,
+      payload: KanbanUpdateBoardInput,
+      success: KanbanBoardSummary,
+      error: EnvironmentOrchestrationDispatchErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("deleteBoard", "/api/kanban/boards/delete", {
+      headers: OptionalBearerHeaders,
+      payload: KanbanBoardInput,
+      success: KanbanDeleteResult,
+      error: EnvironmentOrchestrationDispatchErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("board", "/api/kanban/board", {
+      headers: OptionalBearerHeaders,
+      payload: KanbanBoardInput,
+      success: KanbanBoard,
+      error: EnvironmentOrchestrationSnapshotErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("projectBoards", "/api/kanban/project-boards", {
+      headers: OptionalBearerHeaders,
+      payload: KanbanProjectBoardsInput,
+      success: KanbanProjectBoards,
+      error: EnvironmentOrchestrationSnapshotErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("lookupProjectCards", "/api/kanban/project-cards", {
+      headers: OptionalBearerHeaders,
+      payload: KanbanLookupProjectCardsInput,
+      success: KanbanLookupProjectCardsResult,
+      error: EnvironmentOrchestrationSnapshotErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("createCard", "/api/kanban/cards", {
+      headers: OptionalBearerHeaders,
+      payload: KanbanCreateCardInput,
+      success: KanbanCard,
+      error: EnvironmentOrchestrationDispatchErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("updateCard", "/api/kanban/cards/update", {
+      headers: OptionalBearerHeaders,
+      payload: KanbanUpdateCardInput,
+      success: KanbanCard,
+      error: EnvironmentOrchestrationDispatchErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("moveCard", "/api/kanban/cards/move", {
+      headers: OptionalBearerHeaders,
+      payload: KanbanMoveCardInput,
+      success: KanbanCard,
+      error: EnvironmentOrchestrationDispatchErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("assignCard", "/api/kanban/cards/assign", {
+      headers: OptionalBearerHeaders,
+      payload: KanbanAssignCardInput,
+      success: KanbanCard,
+      error: EnvironmentOrchestrationDispatchErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("deleteCard", "/api/kanban/cards/delete", {
+      headers: OptionalBearerHeaders,
+      payload: KanbanDeleteCardInput,
+      success: KanbanDeleteResult,
+      error: EnvironmentOrchestrationDispatchErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  ) {}
+
 export class EnvironmentConnectHttpApi extends HttpApiGroup.make("connect")
   .add(
     HttpApiEndpoint.post("linkProof", "/api/connect/link-proof", {
@@ -632,4 +785,5 @@ export class EnvironmentHttpApi extends HttpApi.make("environment")
   .add(EnvironmentAuthHttpApi)
   .add(EnvironmentOrchestrationHttpApi)
   .add(EnvironmentJiraHttpApi)
+  .add(EnvironmentKanbanHttpApi)
   .add(EnvironmentConnectHttpApi) {}

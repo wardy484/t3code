@@ -1,40 +1,35 @@
-import type { JiraBoardIssue, JiraIntegrationConfiguration, ThreadId } from "@t3tools/contracts";
+import type { EnvironmentId, KanbanProjectCard, ProjectId, ThreadId } from "@t3tools/contracts";
 import { ArrowUpRightIcon, LoaderCircleIcon, RefreshCwIcon, TicketIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { fetchJiraIntegrationStatus, getJiraTicketAction, lookupJiraIssues } from "~/jira";
-import type { JiraThreadTicketRelationship } from "~/jiraThreadTickets";
 import { Button } from "~/components/ui/button";
+import { getJiraTicketAction } from "~/jira";
+import type { JiraThreadTicketRelationship } from "~/jiraThreadTickets";
+import { lookupProjectKanbanCards } from "~/kanban";
 
 interface JiraTicketsPanelProps {
-  issueKeys: readonly string[];
-  relationships: ReadonlyMap<string, JiraThreadTicketRelationship>;
-  onStartWork: (
-    issue: JiraBoardIssue,
-    configuration: JiraIntegrationConfiguration,
-  ) => Promise<ThreadId>;
-  onOpenThread: (threadId: ThreadId) => void;
+  readonly environmentId: EnvironmentId;
+  readonly projectId: ProjectId;
+  readonly issueKeys: readonly string[];
+  readonly relationships: ReadonlyMap<string, JiraThreadTicketRelationship>;
+  readonly onStartWork: (match: KanbanProjectCard) => Promise<ThreadId>;
+  readonly onOpenThread: (threadId: ThreadId) => void;
 }
 
 type LoadState =
-  | { status: "loading" }
-  | { status: "empty" }
-  | { status: "error"; message: string }
-  | {
-      status: "ready";
-      configuration: JiraIntegrationConfiguration;
-      issues: readonly JiraBoardIssue[];
-    };
+  | { readonly status: "loading" }
+  | { readonly status: "empty" }
+  | { readonly status: "error"; readonly message: string }
+  | { readonly status: "ready"; readonly matches: readonly KanbanProjectCard[] };
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Jira returned an unexpected error.";
-}
+const errorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : "Jira returned an unexpected error.";
 
 export function JiraTicketsPanel(props: JiraTicketsPanelProps) {
   const [refreshKey, setRefreshKey] = useState(0);
   const [loadState, setLoadState] = useState<LoadState>({ status: "loading" });
-  const [startingIssueKeys, setStartingIssueKeys] = useState<ReadonlySet<string>>(() => new Set());
-  const startingIssueKeysRef = useRef(new Set<string>());
+  const [startingKeys, setStartingKeys] = useState<ReadonlySet<string>>(() => new Set());
+  const startingKeysRef = useRef(new Set<string>());
   const [startErrors, setStartErrors] = useState<ReadonlyMap<string, string>>(() => new Map());
   const [startedThreads, setStartedThreads] = useState<ReadonlyMap<string, ThreadId>>(
     () => new Map(),
@@ -50,24 +45,26 @@ export function JiraTicketsPanel(props: JiraTicketsPanelProps) {
       };
     }
     setLoadState({ status: "loading" });
-    void Promise.all([
-      fetchJiraIntegrationStatus(),
-      lookupJiraIssues({ issueKeys: [...props.issueKeys] }),
-    ])
-      .then(([integration, result]) => {
+    void lookupProjectKanbanCards(props.environmentId, {
+      projectId: props.projectId,
+      issueKeys: [...props.issueKeys],
+    })
+      .then((result) => {
         if (!active) return;
-        if (!integration.configuration) {
-          setLoadState({ status: "error", message: "Configure Jira to load these tickets." });
-          return;
-        }
-        const byKey = new Map(result.issues.map((issue) => [issue.key.toUpperCase(), issue]));
+        const jiraMatches = result.matches.filter(
+          (
+            match,
+          ): match is KanbanProjectCard & { card: KanbanProjectCard["card"] & { url: string } } =>
+            match.board.source === "jira" && match.card.url !== null,
+        );
+        const order = new Map(props.issueKeys.map((key, index) => [key.toUpperCase(), index]));
         setLoadState({
           status: "ready",
-          configuration: integration.configuration,
-          issues: props.issueKeys.flatMap((issueKey) => {
-            const issue = byKey.get(issueKey);
-            return issue ? [issue] : [];
-          }),
+          matches: jiraMatches.toSorted(
+            (left, right) =>
+              (order.get(left.card.key.toUpperCase()) ?? Number.MAX_SAFE_INTEGER) -
+              (order.get(right.card.key.toUpperCase()) ?? Number.MAX_SAFE_INTEGER),
+          ),
         });
       })
       .catch((error) => {
@@ -76,7 +73,7 @@ export function JiraTicketsPanel(props: JiraTicketsPanelProps) {
     return () => {
       active = false;
     };
-  }, [issueKeySignature, refreshKey]);
+  }, [issueKeySignature, props.environmentId, props.projectId, refreshKey]);
 
   const relationships = useMemo(() => {
     const next = new Map(props.relationships);
@@ -87,25 +84,26 @@ export function JiraTicketsPanel(props: JiraTicketsPanelProps) {
   }, [props.relationships, startedThreads]);
 
   const startWork = useCallback(
-    async (issue: JiraBoardIssue, configuration: JiraIntegrationConfiguration) => {
-      if (startingIssueKeysRef.current.has(issue.key) || relationships.has(issue.key)) return;
-      startingIssueKeysRef.current.add(issue.key);
-      setStartingIssueKeys((current) => new Set(current).add(issue.key));
+    async (match: KanbanProjectCard) => {
+      const operationKey = `${match.board.id}:${match.card.key}`;
+      if (startingKeysRef.current.has(operationKey) || relationships.has(match.card.key)) return;
+      startingKeysRef.current.add(operationKey);
+      setStartingKeys((current) => new Set(current).add(operationKey));
       setStartErrors((current) => {
         const next = new Map(current);
-        next.delete(issue.key);
+        next.delete(operationKey);
         return next;
       });
       try {
-        const workThreadId = await props.onStartWork(issue, configuration);
-        setStartedThreads((current) => new Map(current).set(issue.key, workThreadId));
+        const workThreadId = await props.onStartWork(match);
+        setStartedThreads((current) => new Map(current).set(match.card.key, workThreadId));
       } catch (error) {
-        setStartErrors((current) => new Map(current).set(issue.key, errorMessage(error)));
+        setStartErrors((current) => new Map(current).set(operationKey, errorMessage(error)));
       } finally {
-        startingIssueKeysRef.current.delete(issue.key);
-        setStartingIssueKeys((current) => {
+        startingKeysRef.current.delete(operationKey);
+        setStartingKeys((current) => {
           const next = new Set(current);
-          next.delete(issue.key);
+          next.delete(operationKey);
           return next;
         });
       }
@@ -116,12 +114,10 @@ export function JiraTicketsPanel(props: JiraTicketsPanelProps) {
   if (loadState.status === "loading") {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center gap-2 text-sm text-muted-foreground">
-        <LoaderCircleIcon className="size-4 animate-spin" />
-        Loading tickets
+        <LoaderCircleIcon className="size-4 animate-spin" /> Loading tickets
       </div>
     );
   }
-
   if (loadState.status === "empty") {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center p-6 text-center">
@@ -135,7 +131,6 @@ export function JiraTicketsPanel(props: JiraTicketsPanelProps) {
       </div>
     );
   }
-
   if (loadState.status === "error") {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center p-6 text-center">
@@ -143,14 +138,14 @@ export function JiraTicketsPanel(props: JiraTicketsPanelProps) {
           <TicketIcon className="mx-auto size-6 text-muted-foreground" />
           <p className="mt-3 text-sm font-medium">Could not load tickets</p>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{loadState.message}</p>
-          <div className="mt-4 flex justify-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => setRefreshKey((value) => value + 1)}>
-              Retry
-            </Button>
-            <Button size="sm" variant="ghost" render={<a href="/settings/integrations" />}>
-              Jira settings
-            </Button>
-          </div>
+          <Button
+            className="mt-4"
+            size="sm"
+            variant="outline"
+            onClick={() => setRefreshKey((value) => value + 1)}
+          >
+            Retry
+          </Button>
         </div>
       </div>
     );
@@ -160,8 +155,8 @@ export function JiraTicketsPanel(props: JiraTicketsPanelProps) {
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex h-11 shrink-0 items-center justify-between border-b border-border/60 px-3">
         <p className="text-xs text-muted-foreground">
-          {loadState.issues.length} {loadState.issues.length === 1 ? "ticket" : "tickets"} from this
-          thread
+          {loadState.matches.length} {loadState.matches.length === 1 ? "ticket" : "tickets"}{" "}
+          assigned to this project
         </p>
         <Button
           size="icon-xs"
@@ -174,32 +169,34 @@ export function JiraTicketsPanel(props: JiraTicketsPanelProps) {
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         <div className="grid gap-2">
-          {loadState.issues.map((issue) => {
-            const relationship = relationships.get(issue.key);
-            const starting = startingIssueKeys.has(issue.key);
-            const startError = startErrors.get(issue.key);
-            const canStart = getJiraTicketAction(issue.statusName) !== null;
+          {loadState.matches.map((match) => {
+            const { board, card } = match;
+            const operationKey = `${board.id}:${card.key}`;
+            const relationship = relationships.get(card.key);
+            const starting = startingKeys.has(operationKey);
+            const startError = startErrors.get(operationKey);
+            const canStart = getJiraTicketAction(card.statusName) !== null;
             return (
               <article
-                key={issue.key}
+                key={operationKey}
                 className="min-w-0 rounded-lg border border-border/80 bg-card p-3 shadow-xs dark:border-transparent dark:shadow-none dark:inset-ring-1 dark:inset-ring-white/5"
               >
                 <div className="flex min-w-0 items-start justify-between gap-3">
                   <a
-                    href={issue.url}
+                    href={card.url ?? undefined}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex min-w-0 items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
                   >
-                    {issue.key}
+                    {card.key} · {board.name}
                     <ArrowUpRightIcon className="size-3" />
                   </a>
                   <span className="max-w-36 shrink-0 truncate rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
-                    {issue.statusName}
+                    {card.statusName}
                   </span>
                 </div>
-                <h3 className="mt-2 min-w-0 break-words text-sm font-medium leading-snug [overflow-wrap:anywhere]">
-                  {issue.summary}
+                <h3 className="mt-2 min-w-0 break-words text-sm leading-snug font-medium [overflow-wrap:anywhere]">
+                  {card.summary}
                 </h3>
                 {relationship || canStart ? (
                   <div className="mt-3 flex justify-end border-t border-border/60 pt-3">
@@ -212,13 +209,8 @@ export function JiraTicketsPanel(props: JiraTicketsPanelProps) {
                         Open thread
                       </Button>
                     ) : (
-                      <Button
-                        size="sm"
-                        disabled={starting}
-                        onClick={() => void startWork(issue, loadState.configuration)}
-                      >
-                        {starting ? <LoaderCircleIcon className="animate-spin" /> : null}
-                        Start work
+                      <Button size="sm" disabled={starting} onClick={() => void startWork(match)}>
+                        {starting ? <LoaderCircleIcon className="animate-spin" /> : null} Start work
                       </Button>
                     )}
                   </div>

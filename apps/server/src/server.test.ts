@@ -79,6 +79,7 @@ import { resolveAvailableEditorsForConfig } from "./ws.ts";
 import * as CheckpointDiffQuery from "./checkpointing/CheckpointDiffQuery.ts";
 import * as GitManager from "./git/GitManager.ts";
 import * as Keybindings from "./keybindings.ts";
+import * as KanbanService from "./kanban/KanbanService.ts";
 import * as ExternalLauncher from "./process/externalLauncher.ts";
 import * as OrchestrationEngine from "./orchestration/Services/OrchestrationEngine.ts";
 import { OrchestrationListenerCallbackError } from "./orchestration/Errors.ts";
@@ -330,6 +331,7 @@ const buildAppUnderTest = (options?: {
   config?: Partial<ServerConfig.ServerConfig["Service"]>;
   layers?: {
     keybindings?: Partial<Keybindings.Keybindings["Service"]>;
+    kanbanService?: Partial<KanbanService.KanbanService["Service"]>;
     providerRegistry?: Partial<ProviderRegistry.ProviderRegistry["Service"]>;
     serverSettings?: Partial<ServerSettings.ServerSettingsService["Service"]>;
     externalLauncher?: Partial<ExternalLauncher.ExternalLauncher["Service"]>;
@@ -559,14 +561,35 @@ const buildAppUnderTest = (options?: {
       },
     ).pipe(
       Layer.provide(
-        Layer.mock(Keybindings.Keybindings)({
-          loadConfigState: Effect.succeed({
-            keybindings: [],
-            issues: [],
+        Layer.mergeAll(
+          Layer.mock(KanbanService.KanbanService)({
+            catalog: Effect.succeed({ organizations: [], boards: [] }),
+            createOrganization: () => Effect.die("KanbanService not stubbed in this test"),
+            updateOrganization: () => Effect.die("KanbanService not stubbed in this test"),
+            deleteOrganization: () => Effect.die("KanbanService not stubbed in this test"),
+            createNativeBoard: () => Effect.die("KanbanService not stubbed in this test"),
+            createJiraBoard: () => Effect.die("KanbanService not stubbed in this test"),
+            updateBoard: () => Effect.die("KanbanService not stubbed in this test"),
+            deleteBoard: () => Effect.die("KanbanService not stubbed in this test"),
+            getBoard: () => Effect.die("KanbanService not stubbed in this test"),
+            getProjectBoards: () => Effect.die("KanbanService not stubbed in this test"),
+            lookupProjectCards: () => Effect.die("KanbanService not stubbed in this test"),
+            createCard: () => Effect.die("KanbanService not stubbed in this test"),
+            updateCard: () => Effect.die("KanbanService not stubbed in this test"),
+            moveCard: () => Effect.die("KanbanService not stubbed in this test"),
+            assignCard: () => Effect.die("KanbanService not stubbed in this test"),
+            deleteCard: () => Effect.die("KanbanService not stubbed in this test"),
+            ...options?.layers?.kanbanService,
           }),
-          streamChanges: Stream.empty,
-          ...options?.layers?.keybindings,
-        }),
+          Layer.mock(Keybindings.Keybindings)({
+            loadConfigState: Effect.succeed({
+              keybindings: [],
+              issues: [],
+            }),
+            streamChanges: Stream.empty,
+            ...options?.layers?.keybindings,
+          }),
+        ),
       ),
       Layer.provide(
         Layer.mock(ProviderRegistry.ProviderRegistry)({
