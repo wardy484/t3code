@@ -50,6 +50,7 @@ export function useNewThreadHandler() {
         worktreePath?: string | null;
         envMode?: DraftThreadEnvMode;
         startFromOrigin?: boolean;
+        initialPrompt?: string;
         replace?: boolean;
       },
     ): Promise<void> => {
@@ -62,6 +63,7 @@ export function useNewThreadHandler() {
         setDraftThreadContext,
         setLogicalProjectDraftThreadId,
         setModelSelection,
+        setPrompt,
       } = useComposerDraftStore.getState();
       const currentRouteTarget = getCurrentRouteTarget();
       // A new thread carries the user's *working mode* from the thread being
@@ -195,6 +197,9 @@ export function useNewThreadHandler() {
               ...(carryInteractionMode ? { interactionMode: carryInteractionMode } : {}),
             },
           );
+          if (options?.initialPrompt !== undefined) {
+            setPrompt(reusableStoredDraftThread.draftId, options.initialPrompt);
+          }
           if (
             currentRouteTarget?.kind === "draft" &&
             currentRouteTarget.draftId === reusableStoredDraftThread.draftId
@@ -238,6 +243,9 @@ export function useNewThreadHandler() {
           ...(hasEnvModeOption ? { envMode: options?.envMode } : {}),
           ...(hasStartFromOriginOption ? { startFromOrigin: options?.startFromOrigin } : {}),
         });
+        if (options?.initialPrompt !== undefined) {
+          setPrompt(currentRouteTarget.draftId, options.initialPrompt);
+        }
         return Promise.resolve();
       }
 
@@ -261,6 +269,9 @@ export function useNewThreadHandler() {
           runtimeMode: carryRuntimeMode ?? DEFAULT_RUNTIME_MODE,
           ...(carryInteractionMode ? { interactionMode: carryInteractionMode } : {}),
         });
+        if (options?.initialPrompt !== undefined) {
+          setPrompt(draftId, options.initialPrompt);
+        }
         applyStickyState(draftId);
         if (carryModelSelection) {
           // After sticky state so the viewed thread's exact selection

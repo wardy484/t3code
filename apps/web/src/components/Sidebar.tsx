@@ -123,6 +123,7 @@ import {
 import { stackedThreadToast, toastManager } from "./ui/toast";
 import { formatRelativeTimeLabel } from "../timestampFormat";
 import { SettingsSidebarNav } from "./settings/SettingsSidebarNav";
+import { JiraSidebarButton } from "./JiraSidebarButton";
 import { Kbd } from "./ui/kbd";
 import {
   getArm64IntelBuildWarningDescription,
@@ -2843,6 +2844,9 @@ const SidebarProjectsContent = memo(function SidebarProjectsContent(
                   </Kbd>
                 ) : null}
               </CommandDialogTrigger>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <JiraSidebarButton />
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>

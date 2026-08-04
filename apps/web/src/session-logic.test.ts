@@ -691,6 +691,19 @@ describe("workEntryIndicatesToolFailure", () => {
 });
 
 describe("deriveWorkLogEntries", () => {
+  it("keeps Jira ticket relationship activities out of the chat work log", () => {
+    const entries = deriveWorkLogEntries([
+      makeActivity({
+        id: "jira-ticket-work",
+        kind: "jira.ticket.work-started",
+        summary: "Work started on KG-3345",
+        payload: { issueKey: "KG-3345", workThreadId: "thread-work" },
+      }),
+    ]);
+
+    expect(entries).toEqual([]);
+  });
+
   it("omits tool started entries and keeps completed entries", () => {
     const activities: OrchestrationThreadActivity[] = [
       makeActivity({

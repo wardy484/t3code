@@ -42,6 +42,20 @@ import {
   RelayEnvironmentMintResponse,
   RelayLinkProofRequest,
 } from "./relay.ts";
+import {
+  JiraAssignIssueInput,
+  JiraAssignIssueResult,
+  JiraBoard,
+  JiraBoardDiscoveryResult,
+  JiraDisconnectResult,
+  JiraDiscoverBoardsInput,
+  JiraIntegrationStatus,
+  JiraLookupIssuesInput,
+  JiraLookupIssuesResult,
+  JiraSaveConfigurationInput,
+  JiraTransitionIssueInput,
+  JiraTransitionIssueResult,
+} from "./jira.ts";
 
 const OptionalBearerHeaders = Schema.Struct({
   authorization: Schema.optionalKey(Schema.String),
@@ -489,6 +503,69 @@ export class EnvironmentOrchestrationHttpApi extends HttpApiGroup.make("orchestr
     }).middleware(EnvironmentAuthenticatedAuth),
   ) {}
 
+export class EnvironmentJiraHttpApi extends HttpApiGroup.make("jira")
+  .add(
+    HttpApiEndpoint.get("status", "/api/jira/status", {
+      headers: OptionalBearerHeaders,
+      success: JiraIntegrationStatus,
+      error: EnvironmentOrchestrationSnapshotErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("discoverBoards", "/api/jira/discover", {
+      headers: OptionalBearerHeaders,
+      payload: JiraDiscoverBoardsInput,
+      success: JiraBoardDiscoveryResult,
+      error: EnvironmentOrchestrationDispatchErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("saveConfiguration", "/api/jira/configuration", {
+      headers: OptionalBearerHeaders,
+      payload: JiraSaveConfigurationInput,
+      success: JiraIntegrationStatus,
+      error: EnvironmentOrchestrationDispatchErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("disconnect", "/api/jira/disconnect", {
+      headers: OptionalBearerHeaders,
+      success: JiraDisconnectResult,
+      error: EnvironmentOrchestrationDispatchErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.get("board", "/api/jira/board", {
+      headers: OptionalBearerHeaders,
+      success: JiraBoard,
+      error: EnvironmentOrchestrationSnapshotErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("transitionIssue", "/api/jira/transitions", {
+      headers: OptionalBearerHeaders,
+      payload: JiraTransitionIssueInput,
+      success: JiraTransitionIssueResult,
+      error: EnvironmentOrchestrationDispatchErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("assignIssue", "/api/jira/assign", {
+      headers: OptionalBearerHeaders,
+      payload: JiraAssignIssueInput,
+      success: JiraAssignIssueResult,
+      error: EnvironmentOrchestrationDispatchErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("lookupIssues", "/api/jira/issues", {
+      headers: OptionalBearerHeaders,
+      payload: JiraLookupIssuesInput,
+      success: JiraLookupIssuesResult,
+      error: EnvironmentOrchestrationSnapshotErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  ) {}
+
 export class EnvironmentConnectHttpApi extends HttpApiGroup.make("connect")
   .add(
     HttpApiEndpoint.post("linkProof", "/api/connect/link-proof", {
@@ -554,4 +631,5 @@ export class EnvironmentHttpApi extends HttpApi.make("environment")
   .add(EnvironmentMetadataHttpApi)
   .add(EnvironmentAuthHttpApi)
   .add(EnvironmentOrchestrationHttpApi)
+  .add(EnvironmentJiraHttpApi)
   .add(EnvironmentConnectHttpApi) {}

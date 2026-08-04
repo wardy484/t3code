@@ -4,6 +4,7 @@ export type SettingsPath =
   | "/settings/keybindings"
   | "/settings/providers"
   | "/settings/source-control"
+  | "/settings/integrations"
   | "/settings/connections"
   | "/settings/beta"
   | "/settings/archived";
@@ -25,6 +26,7 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/keybindings": "Keybindings",
   "/settings/providers": "Providers",
   "/settings/source-control": "Source Control",
+  "/settings/integrations": "Integrations",
   "/settings/connections": "Connections",
   "/settings/beta": "Beta",
   "/settings/archived": "Archive",
@@ -140,6 +142,11 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "source-control",
     title: "Source control",
     to: "/settings/source-control",
+  },
+  {
+    id: "jira-integration",
+    title: "Jira",
+    to: "/settings/integrations",
   },
   {
     id: "remote-environments",

@@ -15,6 +15,8 @@ import {
   type ThreadId,
   type TurnId,
   type KeybindingCommand,
+  type JiraBoardIssue,
+  type JiraIntegrationConfiguration,
   OrchestrationThreadActivity,
   ProviderInteractionMode,
   ProviderDriverKind,
@@ -139,6 +141,9 @@ import {
   usePreviewMiniPlayerStore,
 } from "../previewMiniPlayerStore";
 import { RightPanelTabs } from "./RightPanelTabs";
+import { JiraTicketsPanel } from "./JiraTicketsPanel";
+import { deriveJiraTicketRelationships, extractJiraIssueKeys } from "../jiraThreadTickets";
+import { assignJiraIssue, buildJiraTicketPrompt, shouldAssignJiraTicket } from "../jira";
 import { DiffWorkerPoolProvider } from "./DiffWorkerPoolProvider";
 import { BranchToolbar } from "./BranchToolbar";
 import { resolveShortcutCommand, shortcutLabelForCommand } from "../keybindings";
@@ -1501,6 +1506,14 @@ function ChatViewContent(props: ChatViewProps) {
     [activeThread],
   );
   const activeThreadKey = activeThreadRef ? scopedThreadKey(activeThreadRef) : null;
+  const jiraIssueKeys = useMemo(
+    () => extractJiraIssueKeys(activeThread?.messages ?? []),
+    [activeThread?.messages],
+  );
+  const jiraTicketRelationships = useMemo(
+    () => deriveJiraTicketRelationships(activeThread?.activities ?? []),
+    [activeThread?.activities],
+  );
   const [timelineAnchor, setTimelineAnchor] = useState<{
     readonly threadKey: string | null;
     readonly messageId: MessageId | null;
@@ -1540,6 +1553,17 @@ function ChatViewContent(props: ChatViewProps) {
   );
   const previewPanelOpen = activeRightPanelKind === "preview" && isPreviewSupportedInRuntime();
   const rightPanelOpen = rightPanelState.isOpen;
+  const jiraTicketSignature = jiraIssueKeys.join(",");
+  const seenJiraTicketSignaturesRef = useRef(new Map<string, string>());
+  useEffect(() => {
+    if (!activeThreadKey || !activeThreadRef || !isServerThread || jiraIssueKeys.length === 0) {
+      return;
+    }
+    const previousSignature = seenJiraTicketSignaturesRef.current.get(activeThreadKey);
+    seenJiraTicketSignaturesRef.current.set(activeThreadKey, jiraTicketSignature);
+    if (previousSignature === jiraTicketSignature) return;
+    useRightPanelStore.getState().open(activeThreadRef, "tickets");
+  }, [activeThreadKey, activeThreadRef, isServerThread, jiraIssueKeys.length, jiraTicketSignature]);
   const canMaximizeRightPanel = rightPanelOpen && !shouldUsePlanSidebarSheet;
   const rightPanelMaximized =
     canMaximizeRightPanel && maximizedRightPanelThreadKey === routeThreadKey;
@@ -3132,6 +3156,94 @@ function ChatViewContent(props: ChatViewProps) {
     if (!activeThreadRef || !activeProject) return;
     useRightPanelStore.getState().open(activeThreadRef, "files");
   }, [activeProject, activeThreadRef]);
+  const addTicketsSurface = useCallback(() => {
+    if (!activeThreadRef || jiraIssueKeys.length === 0) return;
+    useRightPanelStore.getState().open(activeThreadRef, "tickets");
+  }, [activeThreadRef, jiraIssueKeys.length]);
+  const startJiraTicketWork = useCallback(
+    async (issue: JiraBoardIssue, configuration: JiraIntegrationConfiguration) => {
+      if (!activeThread || !isServerThread || !primaryEnvironmentId) {
+        throw new Error("Jira work can only be started from a saved thread.");
+      }
+      if (activeThread.environmentId !== primaryEnvironmentId) {
+        throw new Error("Jira work must be started from the primary T3 environment.");
+      }
+      const project = allProjects.find(
+        (candidate) =>
+          candidate.environmentId === primaryEnvironmentId &&
+          candidate.workspaceRoot === configuration.projectPath,
+      );
+      if (!project) {
+        throw new Error("The Jira integration's T3 project is no longer available.");
+      }
+
+      let ticket = issue;
+      if (shouldAssignJiraTicket(issue, "work")) {
+        const assignment = await assignJiraIssue({ issueKey: issue.key });
+        ticket = { ...issue, assignee: assignment.assignee };
+      }
+
+      const workThreadId = newThreadId();
+      const createdAt = new Date().toISOString();
+      const title = truncate(`${issue.key}: ${issue.summary}`);
+      const result = await startThreadTurn({
+        environmentId: primaryEnvironmentId,
+        input: {
+          threadId: workThreadId,
+          message: {
+            messageId: newMessageId(),
+            role: "user",
+            text: buildJiraTicketPrompt(ticket, "work"),
+            attachments: [],
+          },
+          modelSelection: activeThread.modelSelection,
+          titleSeed: title,
+          runtimeMode: activeThread.runtimeMode,
+          interactionMode: activeThread.interactionMode,
+          sourceJiraTicket: {
+            sourceThreadId: activeThread.id,
+            issueKey: issue.key,
+            issueSummary: issue.summary,
+            issueUrl: issue.url,
+          },
+          bootstrap: {
+            createThread: {
+              projectId: project.id,
+              title,
+              modelSelection: activeThread.modelSelection,
+              runtimeMode: activeThread.runtimeMode,
+              interactionMode: activeThread.interactionMode,
+              branch: configuration.baseBranch,
+              worktreePath: null,
+              createdAt,
+            },
+            prepareWorktree: {
+              projectCwd: project.workspaceRoot,
+              baseBranch: configuration.baseBranch,
+              branch: buildTemporaryWorktreeBranchName(randomHex),
+            },
+            runSetupScript: true,
+          },
+          createdAt,
+        },
+      });
+      if (result._tag === "Failure") {
+        throw squashAtomCommandFailure(result);
+      }
+      return workThreadId;
+    },
+    [activeThread, allProjects, isServerThread, primaryEnvironmentId, startThreadTurn],
+  );
+  const openJiraWorkThread = useCallback(
+    (workThreadId: ThreadId) => {
+      if (!primaryEnvironmentId) return;
+      void navigate({
+        to: "/$environmentId/$threadId",
+        params: { environmentId: primaryEnvironmentId, threadId: workThreadId },
+      });
+    },
+    [navigate, primaryEnvironmentId],
+  );
   const openFileSurface = useCallback(
     (relativePath: string) => {
       if (!activeThreadRef || !activeProject) return;
@@ -5703,6 +5815,13 @@ function ChatViewContent(props: ChatViewProps) {
         timestampFormat={timestampFormat}
         mode="embedded"
       />
+    ) : activeRightPanelSurface?.kind === "tickets" ? (
+      <JiraTicketsPanel
+        issueKeys={jiraIssueKeys}
+        relationships={jiraTicketRelationships}
+        onStartWork={startJiraTicketWork}
+        onOpenThread={openJiraWorkThread}
+      />
     ) : (activeRightPanelSurface?.kind === "files" || activeRightPanelSurface?.kind === "file") &&
       activeProject &&
       activeWorkspaceRoot ? (
@@ -6134,9 +6253,11 @@ function ChatViewContent(props: ChatViewProps) {
           onAddTerminal={addTerminalSurface}
           onAddDiff={addDiffSurface}
           onAddFiles={addFilesSurface}
+          onAddTickets={addTicketsSurface}
           browserAvailable={isPreviewSupportedInRuntime()}
           diffAvailable={isServerThread && isGitRepo}
           filesAvailable={activeProject !== null}
+          ticketsAvailable={jiraIssueKeys.length > 0}
         >
           {rightPanelContent}
         </RightPanelTabs>
@@ -6161,9 +6282,11 @@ function ChatViewContent(props: ChatViewProps) {
             onAddTerminal={addTerminalSurface}
             onAddDiff={addDiffSurface}
             onAddFiles={addFilesSurface}
+            onAddTickets={addTicketsSurface}
             browserAvailable={isPreviewSupportedInRuntime()}
             diffAvailable={isServerThread && isGitRepo}
             filesAvailable={activeProject !== null}
+            ticketsAvailable={jiraIssueKeys.length > 0}
           >
             {rightPanelContent}
           </RightPanelTabs>

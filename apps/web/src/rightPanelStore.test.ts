@@ -142,6 +142,17 @@ describe("rightPanelStore", () => {
     });
   });
 
+  it("keeps Tickets as a thread-scoped singleton surface", () => {
+    useRightPanelStore.getState().open(refA, "tickets");
+    useRightPanelStore.getState().open(refA, "tickets");
+
+    expect(selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refA)).toEqual({
+      isOpen: true,
+      activeSurfaceId: "tickets",
+      surfaces: [{ id: "tickets", kind: "tickets" }],
+    });
+  });
+
   it("replaces the standalone explorer with peer file surfaces", () => {
     useRightPanelStore.getState().open(refA, "files");
     useRightPanelStore.getState().openFile(refA, "src/index.ts");

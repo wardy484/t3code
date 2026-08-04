@@ -45,6 +45,8 @@ import {
 } from "../../serverSettings.ts";
 import { VcsStatusBroadcaster } from "../../vcs/VcsStatusBroadcaster.ts";
 import { GitWorkflowService } from "../../git/GitWorkflowService.ts";
+import { resolveRequestedWorktreeBranchName } from "../worktreeBranchRequest.ts";
+import { appendJiraWorkStartedContext } from "../jiraTickets.ts";
 const isProviderAdapterRequestError = Schema.is(ProviderAdapterRequestError);
 const isProviderDriverKind = Schema.is(ProviderDriverKind);
 
@@ -747,24 +749,27 @@ const make = Effect.gen(function* () {
     const cwd = input.worktreePath;
     const attachments = input.attachments ?? [];
     yield* Effect.gen(function* () {
-      const settings = yield* serverSettingsService.getSettings;
-      const modelSelection =
-        settings.sourceControlWriterModelSelection === null
-          ? settings.textGenerationModelSelection
-          : resolveSourceControlWriterModelSelection(
-              settings,
-              yield* providerRegistry.getProviders,
-            );
-
-      const generated = yield* textGeneration.generateBranchName({
-        cwd,
-        message: input.messageText,
-        ...(attachments.length > 0 ? { attachments } : {}),
-        modelSelection,
-      });
-      if (!generated) return;
-
-      const targetBranch = buildGeneratedWorktreeBranchName(generated.branch);
+      const requestedBranch = resolveRequestedWorktreeBranchName(input.messageText);
+      const targetBranch = yield* requestedBranch
+        ? Effect.succeed(requestedBranch)
+        : Effect.gen(function* () {
+            const settings = yield* serverSettingsService.getSettings;
+            const modelSelection =
+              settings.sourceControlWriterModelSelection === null
+                ? settings.textGenerationModelSelection
+                : resolveSourceControlWriterModelSelection(
+                    settings,
+                    yield* providerRegistry.getProviders,
+                  );
+            const generated = yield* textGeneration.generateBranchName({
+              cwd,
+              message: input.messageText,
+              ...(attachments.length > 0 ? { attachments } : {}),
+              modelSelection,
+            });
+            return generated ? buildGeneratedWorktreeBranchName(generated.branch) : null;
+          });
+      if (!targetBranch) return;
       if (targetBranch === oldBranch) return;
 
       const renamed = yield* gitWorkflow.renameBranch({ cwd, oldBranch, newBranch: targetBranch });
@@ -1098,7 +1103,10 @@ const make = Effect.gen(function* () {
 
     const sendTurnRequest = yield* buildSendTurnRequestForThread({
       threadId: event.payload.threadId,
-      messageText: message.text,
+      messageText: appendJiraWorkStartedContext(
+        message.text,
+        event.payload.jiraWorkStartedNotices ?? [],
+      ),
       ...(message.attachments !== undefined ? { attachments: message.attachments } : {}),
       ...(event.payload.modelSelection !== undefined
         ? { modelSelection: event.payload.modelSelection }

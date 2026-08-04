@@ -1,6 +1,15 @@
 import type { ContextMenuItem, PreviewSessionSnapshot } from "@t3tools/contracts";
 import { getTerminalLabel } from "@t3tools/shared/terminalLabels";
-import { ClipboardList, FileDiff, Files, Globe2, Plus, TerminalSquare, X } from "lucide-react";
+import {
+  ClipboardList,
+  FileDiff,
+  Files,
+  Globe2,
+  Plus,
+  TerminalSquare,
+  TicketIcon,
+  X,
+} from "lucide-react";
 import {
   type MouseEvent as ReactMouseEvent,
   type ReactElement,
@@ -44,9 +53,11 @@ interface RightPanelTabsProps {
   onAddTerminal: () => void;
   onAddDiff: () => void;
   onAddFiles: () => void;
+  onAddTickets: () => void;
   browserAvailable: boolean;
   diffAvailable: boolean;
   filesAvailable: boolean;
+  ticketsAvailable: boolean;
   children: ReactNode;
 }
 
@@ -54,6 +65,7 @@ const SURFACE_DISABLED_REASONS = {
   browser: "Browser previews are only available in the T3 Code desktop app.",
   files: "Files are only available when a project is open.",
   diff: "Diff is only available for server threads in Git repositories.",
+  tickets: "No Jira tickets have been surfaced in this thread.",
 } as const;
 
 type TabContextMenuAction = "copy-path" | "close" | "close-others" | "close-to-right" | "close-all";
@@ -91,11 +103,21 @@ function RightPanelEmptyState(props: {
   onAddTerminal: () => void;
   onAddDiff: () => void;
   onAddFiles: () => void;
+  onAddTickets: () => void;
   browserAvailable: boolean;
   diffAvailable: boolean;
   filesAvailable: boolean;
+  ticketsAvailable: boolean;
 }) {
   const actions = [
+    {
+      label: "Tickets",
+      description: "View Jira tickets surfaced in this thread.",
+      icon: TicketIcon,
+      available: props.ticketsAvailable,
+      disabledReason: SURFACE_DISABLED_REASONS.tickets,
+      onClick: props.onAddTickets,
+    },
     {
       label: "Browser",
       description: "Open a local app or URL.",
@@ -205,6 +227,8 @@ function surfaceTitle(
       );
     case "plan":
       return "Plan";
+    case "tickets":
+      return "Tickets";
     case "preview": {
       const snapshot = surface.resourceId ? sessions[surface.resourceId] : null;
       if (!snapshot || snapshot.navStatus._tag === "Idle") return "Browser";
@@ -266,6 +290,8 @@ function SurfaceIcon({
       return <TerminalSquare className="size-3.5 shrink-0" />;
     case "plan":
       return <ClipboardList className="size-3.5 shrink-0" />;
+    case "tickets":
+      return <TicketIcon className="size-3.5 shrink-0" />;
   }
 }
 
@@ -444,6 +470,14 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                 </MenuTrigger>
                 <MenuPopup align="start" side="bottom" sideOffset={6} className="min-w-44">
                   <SurfaceMenuItem
+                    available={props.ticketsAvailable}
+                    disabledReason={SURFACE_DISABLED_REASONS.tickets}
+                    onClick={props.onAddTickets}
+                  >
+                    <TicketIcon />
+                    Tickets
+                  </SurfaceMenuItem>
+                  <SurfaceMenuItem
                     available={props.browserAvailable}
                     disabledReason={SURFACE_DISABLED_REASONS.browser}
                     onClick={props.onAddBrowser}
@@ -485,9 +519,11 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
             onAddTerminal={props.onAddTerminal}
             onAddDiff={props.onAddDiff}
             onAddFiles={props.onAddFiles}
+            onAddTickets={props.onAddTickets}
             browserAvailable={props.browserAvailable}
             diffAvailable={props.diffAvailable}
             filesAvailable={props.filesAvailable}
+            ticketsAvailable={props.ticketsAvailable}
           />
         ) : (
           props.children

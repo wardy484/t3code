@@ -682,6 +682,38 @@ const ThreadTurnStartBootstrap = Schema.Struct({
 
 export type ThreadTurnStartBootstrap = typeof ThreadTurnStartBootstrap.Type;
 
+export const SourceJiraTicketReference = Schema.Struct({
+  sourceThreadId: ThreadId,
+  issueKey: TrimmedNonEmptyString,
+  issueSummary: TrimmedNonEmptyString,
+  issueUrl: TrimmedNonEmptyString,
+});
+export type SourceJiraTicketReference = typeof SourceJiraTicketReference.Type;
+
+export const JiraWorkStartedNotice = Schema.Struct({
+  issueKey: TrimmedNonEmptyString,
+  issueSummary: TrimmedNonEmptyString,
+  issueUrl: TrimmedNonEmptyString,
+  workThreadId: ThreadId,
+});
+export type JiraWorkStartedNotice = typeof JiraWorkStartedNotice.Type;
+
+export const JiraTicketWorkStartedActivityPayload = Schema.Struct({
+  sourceThreadId: ThreadId,
+  issueKey: TrimmedNonEmptyString,
+  issueSummary: TrimmedNonEmptyString,
+  issueUrl: TrimmedNonEmptyString,
+  workThreadId: ThreadId,
+});
+export type JiraTicketWorkStartedActivityPayload = typeof JiraTicketWorkStartedActivityPayload.Type;
+
+export const JiraTicketWorkNoticeDeliveredActivityPayload = Schema.Struct({
+  issueKey: TrimmedNonEmptyString,
+  workThreadId: ThreadId,
+});
+export type JiraTicketWorkNoticeDeliveredActivityPayload =
+  typeof JiraTicketWorkNoticeDeliveredActivityPayload.Type;
+
 export const ThreadTurnStartCommand = Schema.Struct({
   type: Schema.Literal("thread.turn.start"),
   commandId: CommandId,
@@ -700,6 +732,7 @@ export const ThreadTurnStartCommand = Schema.Struct({
   ),
   bootstrap: Schema.optional(ThreadTurnStartBootstrap),
   sourceProposedPlan: Schema.optional(SourceProposedPlanReference),
+  sourceJiraTicket: Schema.optional(SourceJiraTicketReference),
   createdAt: IsoDateTime,
 });
 
@@ -719,6 +752,7 @@ const ClientThreadTurnStartCommand = Schema.Struct({
   interactionMode: ProviderInteractionMode,
   bootstrap: Schema.optional(ThreadTurnStartBootstrap),
   sourceProposedPlan: Schema.optional(SourceProposedPlanReference),
+  sourceJiraTicket: Schema.optional(SourceJiraTicketReference),
   createdAt: IsoDateTime,
 });
 
@@ -1075,6 +1109,7 @@ export const ThreadTurnStartRequestedPayload = Schema.Struct({
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_PROVIDER_INTERACTION_MODE)),
   ),
   sourceProposedPlan: Schema.optional(SourceProposedPlanReference),
+  jiraWorkStartedNotices: Schema.optional(Schema.Array(JiraWorkStartedNotice)),
   createdAt: IsoDateTime,
 });
 

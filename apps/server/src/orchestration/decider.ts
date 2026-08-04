@@ -21,6 +21,12 @@ import {
   requireThreadNotArchived,
 } from "./commandInvariants.ts";
 import { projectEvent } from "./projector.ts";
+import {
+  JIRA_TICKET_WORK_NOTICE_DELIVERED_ACTIVITY_KIND,
+  JIRA_TICKET_WORK_STARTED_ACTIVITY_KIND,
+  hasJiraTicketWorkStarted,
+  pendingJiraWorkStartedNotices,
+} from "./jiraTickets.ts";
 
 const nowIso = Effect.map(DateTime.now, DateTime.formatIso);
 
@@ -754,6 +760,31 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
         command,
         threadId: command.threadId,
       });
+      const sourceJiraTicket = command.sourceJiraTicket;
+      const sourceJiraThread = sourceJiraTicket
+        ? yield* requireThread({
+            readModel,
+            command,
+            threadId: sourceJiraTicket.sourceThreadId,
+          })
+        : null;
+      if (sourceJiraThread?.id === targetThread.id) {
+        return yield* new OrchestrationCommandInvariantError({
+          commandType: command.type,
+          detail: "Jira ticket work must start in a different thread.",
+        });
+      }
+      if (
+        sourceJiraThread &&
+        sourceJiraTicket &&
+        hasJiraTicketWorkStarted(sourceJiraThread, sourceJiraTicket.issueKey)
+      ) {
+        return yield* new OrchestrationCommandInvariantError({
+          commandType: command.type,
+          detail: `Work has already started for Jira ticket '${sourceJiraTicket.issueKey}'.`,
+        });
+      }
+      const jiraWorkStartedNotices = pendingJiraWorkStartedNotices(targetThread);
       const sourceProposedPlan = command.sourceProposedPlan;
       const sourceThread = sourceProposedPlan
         ? yield* requireThread({
@@ -817,6 +848,7 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
           runtimeMode: targetThread.runtimeMode,
           interactionMode: targetThread.interactionMode,
           ...(sourceProposedPlan !== undefined ? { sourceProposedPlan } : {}),
+          ...(jiraWorkStartedNotices.length > 0 ? { jiraWorkStartedNotices } : {}),
           createdAt: command.createdAt,
         },
       };
@@ -858,7 +890,67 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
           },
         });
       }
-      return [...lifecycleResetEvents, userMessageEvent, turnStartRequestedEvent];
+      const jiraRelationshipEvents: Array<Omit<OrchestrationEvent, "sequence">> = [];
+      if (sourceJiraTicket) {
+        const eventBase = yield* withEventBase({
+          aggregateKind: "thread",
+          aggregateId: sourceJiraTicket.sourceThreadId,
+          occurredAt: command.createdAt,
+          commandId: command.commandId,
+        });
+        jiraRelationshipEvents.push({
+          ...eventBase,
+          type: "thread.activity-appended",
+          payload: {
+            threadId: sourceJiraTicket.sourceThreadId,
+            activity: {
+              id: eventBase.eventId,
+              tone: "info",
+              kind: JIRA_TICKET_WORK_STARTED_ACTIVITY_KIND,
+              summary: `Work started on ${sourceJiraTicket.issueKey}`,
+              payload: {
+                ...sourceJiraTicket,
+                workThreadId: command.threadId,
+              },
+              turnId: null,
+              createdAt: command.createdAt,
+            },
+          },
+        });
+      }
+      for (const notice of jiraWorkStartedNotices) {
+        const eventBase = yield* withEventBase({
+          aggregateKind: "thread",
+          aggregateId: command.threadId,
+          occurredAt: command.createdAt,
+          commandId: command.commandId,
+        });
+        jiraRelationshipEvents.push({
+          ...eventBase,
+          type: "thread.activity-appended",
+          payload: {
+            threadId: command.threadId,
+            activity: {
+              id: eventBase.eventId,
+              tone: "info",
+              kind: JIRA_TICKET_WORK_NOTICE_DELIVERED_ACTIVITY_KIND,
+              summary: `Agent notified about ${notice.issueKey}`,
+              payload: {
+                issueKey: notice.issueKey,
+                workThreadId: notice.workThreadId,
+              },
+              turnId: null,
+              createdAt: command.createdAt,
+            },
+          },
+        });
+      }
+      return [
+        ...lifecycleResetEvents,
+        userMessageEvent,
+        turnStartRequestedEvent,
+        ...jiraRelationshipEvents,
+      ];
     }
 
     case "thread.turn.interrupt": {
