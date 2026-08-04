@@ -1,0 +1,105 @@
+name: Kim Personal Builds
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kim-personal-builds-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos-arm64-dmg:
+    name: macOS ARM64 DMG (unsigned)
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version-file: package.json
+          cache: true
+          run-install: true
+
+      - name: Build unsigned Apple Silicon DMG
+        run: vp run dist:desktop:artifact --platform mac --target dmg --arch arm64 --build-version "0.0.0-kim.${{ github.run_number }}"
+
+      - name: Upload macOS DMG
+        uses: actions/upload-artifact@v7
+        with:
+          name: t3code-macos-arm64-dmg
+          path: release/*.dmg
+          if-no-files-found: error
+          retention-days: 14
+
+  android-apk:
+    name: Android debug APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      APP_VARIANT: development
+      EXPO_NO_GIT_STATUS: "1"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version-file: package.json
+          cache: true
+          run-install: true
+
+      - name: Generate Android project
+        working-directory: apps/mobile
+        run: vp exec expo prebuild --clean --platform android
+
+      - name: Build installable debug APK
+        working-directory: apps/mobile/android
+        run: ./gradlew assembleDebug
+
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: t3code-android-debug-apk
+          path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  app-server:
+    name: App server bundle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version-file: package.json
+          cache: true
+          run-install: true
+
+      - name: Build app server bundle
+        run: vp run --filter t3 build:bundle
+
+      - name: Upload app server bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: t3code-app-server
+          path: apps/server/dist
+          if-no-files-found: error
+          retention-days: 14
