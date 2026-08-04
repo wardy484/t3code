@@ -16,7 +16,7 @@ OAuth-style scope strings:
 | `orchestration:read`    | Read snapshots, status, events, configuration, and filesystem/VCS state. |
 | `orchestration:operate` | Dispatch user operations and mutate environment-side workspace state.    |
 | `terminal:operate`      | Create, attach, input, resize, clear, restart, and terminate terminals.  |
-| `review:write`          | Read review diff previews used to compose review feedback.               |
+| `review:write`          | Read review diff previews and submit pull request review feedback.       |
 | `access:read`           | Inspect pairing links and client sessions.                               |
 | `access:write`          | Create or revoke pairing links and client sessions.                      |
 | `relay:read`            | Inspect managed relay connectivity.                                      |

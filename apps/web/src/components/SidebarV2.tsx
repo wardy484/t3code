@@ -164,6 +164,7 @@ import { Popover, PopoverPopup, PopoverTrigger } from "./ui/popover";
 import { Tooltip, TooltipPopup, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import { useComposerDraftStore } from "../composerDraftStore";
 import { JiraSidebarButton } from "./JiraSidebarButton";
+import { PullRequestsSidebarButton } from "./PullRequestsSidebarButton";
 
 // Settled-tail paging: recent history is the common lookup; the deep tail
 // stays behind an explicit Show more.
@@ -2687,6 +2688,7 @@ export default function SidebarV2() {
               </div>
             </div>
             <JiraSidebarButton />
+            <PullRequestsSidebarButton />
             {projectGroups.length > 0 ? (
               <div className="flex items-center gap-1">
                 <Menu open={projectScopeMenuOpen} onOpenChange={setProjectScopeMenuOpen}>

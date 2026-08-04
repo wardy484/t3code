@@ -178,6 +178,119 @@ it.effect("treats empty non-open change request listing output as no results", (
   }),
 );
 
+it.effect("merges authored and review-requested PRs for the inbox", () =>
+  Effect.gen(function* () {
+    const provider = yield* makeProvider({
+      execute: (input) =>
+        Effect.succeed(
+          processResult(
+            JSON.stringify([
+              {
+                number: 42,
+                title: "Add pull request inbox",
+                url: "https://github.com/pingdotgg/t3code/pull/42",
+                baseRefName: "main",
+                headRefName: "feature/pr-inbox",
+                state: "OPEN",
+                updatedAt: "2026-08-04T00:00:00.000Z",
+                author: { login: "kim" },
+                isDraft: false,
+                repository: { nameWithOwner: "pingdotgg/t3code" },
+              },
+              ...(input.args.includes("--author")
+                ? []
+                : [
+                    {
+                      number: 43,
+                      title: "Review requested PR",
+                      url: "https://github.com/pingdotgg/t3code/pull/43",
+                      baseRefName: "main",
+                      headRefName: "feature/review",
+                      state: "OPEN",
+                      updatedAt: "2026-08-05T00:00:00.000Z",
+                      author: { login: "theo" },
+                      isDraft: true,
+                      repository: { nameWithOwner: "pingdotgg/t3code" },
+                    },
+                  ]),
+            ]),
+          ),
+        ),
+    });
+
+    const pullRequests = yield* provider.listRelevantChangeRequests!({
+      cwd: "/repo",
+      limit: 50,
+    });
+
+    assert.deepStrictEqual(
+      pullRequests.map((pullRequest) => ({
+        number: pullRequest.number,
+        authoredByViewer: pullRequest.authoredByViewer,
+        reviewRequestedFromViewer: pullRequest.reviewRequestedFromViewer,
+        isDraft: pullRequest.isDraft,
+      })),
+      [
+        {
+          number: 43,
+          authoredByViewer: false,
+          reviewRequestedFromViewer: true,
+          isDraft: true,
+        },
+        {
+          number: 42,
+          authoredByViewer: true,
+          reviewRequestedFromViewer: true,
+          isDraft: false,
+        },
+      ],
+    );
+  }),
+);
+
+it.effect("submits inline GitHub reviews through the reviews API", () =>
+  Effect.gen(function* () {
+    const requests: Array<Parameters<GitHubCli.GitHubCli["Service"]["execute"]>[0]> = [];
+    const provider = yield* makeProvider({
+      execute: (input) => {
+        requests.push(input);
+        return Effect.succeed(processResult("{}"));
+      },
+    });
+
+    yield* provider.submitChangeRequestReview!({
+      cwd: "/repo",
+      pullRequestUrl: "https://github.com/pingdotgg/t3code/pull/42",
+      pullRequestNumber: 42,
+      event: "request-changes",
+      body: "Please address the inline note.",
+      comments: [
+        {
+          path: "src/value.ts",
+          body: "This needs a test.",
+          line: 12,
+          side: "right",
+          startLine: 10,
+          startSide: "right",
+        },
+      ],
+    });
+
+    assert.deepStrictEqual(requests[0]?.args, [
+      "api",
+      "--method",
+      "POST",
+      "repos/pingdotgg/t3code/pulls/42/reviews",
+      "--input",
+      "-",
+    ]);
+    assert.strictEqual(
+      requests[0]?.stdin,
+      '{"event":"REQUEST_CHANGES","body":"Please address the inline note.","comments":[{"path":"src/value.ts","body":"This needs a test.","line":12,"side":"RIGHT","start_line":10,"start_side":"RIGHT"}]}',
+    );
+  }),
+);
+
 it.effect("creates GitHub PRs through provider-neutral input names", () =>
   Effect.gen(function* () {
     let createInput: Parameters<GitHubCli.GitHubCli["Service"]["createPullRequest"]>[0] | null =

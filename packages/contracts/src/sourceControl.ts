@@ -1,5 +1,5 @@
 import * as Schema from "effect/Schema";
-import { PositiveInt, TrimmedNonEmptyString } from "./baseSchemas.ts";
+import { IsoDateTime, PositiveInt, TrimmedNonEmptyString } from "./baseSchemas.ts";
 import { VcsDriverKind } from "./vcs.ts";
 
 export const SourceControlProviderKind = Schema.Literals([
@@ -35,6 +35,38 @@ export const ChangeRequest = Schema.Struct({
   headRepositoryOwnerLogin: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
 });
 export type ChangeRequest = typeof ChangeRequest.Type;
+
+export const RelevantChangeRequest = Schema.Struct({
+  provider: Schema.Literal("github"),
+  number: PositiveInt,
+  title: TrimmedNonEmptyString,
+  url: TrimmedNonEmptyString,
+  repositoryNameWithOwner: TrimmedNonEmptyString,
+  baseRefName: Schema.NullOr(TrimmedNonEmptyString),
+  headRefName: Schema.NullOr(TrimmedNonEmptyString),
+  authorLogin: Schema.NullOr(TrimmedNonEmptyString),
+  isDraft: Schema.Boolean,
+  updatedAt: Schema.NullOr(IsoDateTime),
+  authoredByViewer: Schema.Boolean,
+  reviewRequestedFromViewer: Schema.Boolean,
+});
+export type RelevantChangeRequest = typeof RelevantChangeRequest.Type;
+
+export const ChangeRequestReviewEvent = Schema.Literals(["comment", "approve", "request-changes"]);
+export type ChangeRequestReviewEvent = typeof ChangeRequestReviewEvent.Type;
+
+export const ChangeRequestReviewSide = Schema.Literals(["left", "right"]);
+export type ChangeRequestReviewSide = typeof ChangeRequestReviewSide.Type;
+
+export const ChangeRequestReviewComment = Schema.Struct({
+  path: TrimmedNonEmptyString,
+  body: TrimmedNonEmptyString,
+  line: PositiveInt,
+  side: ChangeRequestReviewSide,
+  startLine: Schema.optional(PositiveInt),
+  startSide: Schema.optional(ChangeRequestReviewSide),
+});
+export type ChangeRequestReviewComment = typeof ChangeRequestReviewComment.Type;
 
 export const SourceControlRepositoryCloneUrls = Schema.Struct({
   nameWithOwner: TrimmedNonEmptyString,

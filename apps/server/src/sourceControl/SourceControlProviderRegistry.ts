@@ -157,8 +157,28 @@ function bindProviderContext(
     return provider;
   }
 
+  const listRelevantChangeRequests = provider.listRelevantChangeRequests;
+  const submitChangeRequestReview = provider.submitChangeRequestReview;
   return SourceControlProvider.SourceControlProvider.of({
     kind: provider.kind,
+    ...(listRelevantChangeRequests
+      ? {
+          listRelevantChangeRequests: (input) =>
+            listRelevantChangeRequests({
+              ...input,
+              context: input.context ?? context,
+            }),
+        }
+      : {}),
+    ...(submitChangeRequestReview
+      ? {
+          submitChangeRequestReview: (input) =>
+            submitChangeRequestReview({
+              ...input,
+              context: input.context ?? context,
+            }),
+        }
+      : {}),
     listChangeRequests: (input) =>
       provider.listChangeRequests({
         ...input,

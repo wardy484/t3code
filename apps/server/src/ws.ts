@@ -1531,6 +1531,18 @@ const makeWsRpcLayer = (
               "rpc.aggregate": "git",
             },
           ),
+        [WS_METHODS.gitListRelevantPullRequests]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.gitListRelevantPullRequests,
+            gitWorkflow.listRelevantPullRequests(input),
+            { "rpc.aggregate": "git" },
+          ),
+        [WS_METHODS.gitSubmitPullRequestReview]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.gitSubmitPullRequestReview,
+            gitWorkflow.submitPullRequestReview(input),
+            { "rpc.aggregate": "git" },
+          ),
         [WS_METHODS.gitPreparePullRequestThread]: (input) =>
           observeRpcEffect(
             WS_METHODS.gitPreparePullRequestThread,

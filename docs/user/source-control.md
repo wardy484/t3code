@@ -37,6 +37,10 @@ T3 Code works with the platforms your team already uses:
 
 **Stay on top of open reviews**
 
+- On web and desktop, open **Pull requests** below **Tickets** to see open GitHub PRs you authored or that request your review
+- Filter the inbox by repository, or select **My work** to show only PRs you authored
+- Select **Review** to check out the PR in a dedicated worktree thread with review context ready for your agent
+- Select **Show me** to ask the agent to run and demonstrate the change; T3 Code uses the `$show-me` skill when the selected provider exposes it and otherwise sends the same request as a normal prompt
 - See if your current branch already has an open PR/MR
 - Open the review directly in your browser with one click
 - Check out a teammate's branch to review code locally
@@ -50,6 +54,13 @@ after the rest of the turn's work log folds.
 
 This uses the GitHub CLI authentication on the machine running T3 Code. T3 Code does not start or
 continue monitoring independently of the agent command.
+
+**Review GitHub changes in T3 Code**
+
+- Open the thread diff and switch between the code diff and the guided file-chunk overview
+- Select changed lines to draft inline review comments
+- Use **Review PR** to submit the summary and supported inline comments to GitHub, then comment, approve, or request changes
+- Comments made against another turn, a stale diff, or a selection spanning both sides of a replacement stay in the agent composer instead of being silently posted to the wrong GitHub lines
 
 ### Know Your Setup at a Glance
 

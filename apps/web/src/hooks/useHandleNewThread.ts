@@ -4,7 +4,7 @@ import {
   scopeProjectRef,
   scopeThreadRef,
 } from "@t3tools/client-runtime/environment";
-import { DEFAULT_RUNTIME_MODE, type ScopedProjectRef } from "@t3tools/contracts";
+import { DEFAULT_RUNTIME_MODE, type ScopedProjectRef, type ThreadId } from "@t3tools/contracts";
 import { useParams, useRouter } from "@tanstack/react-router";
 import { useCallback, useMemo } from "react";
 import {
@@ -52,6 +52,8 @@ export function useNewThreadHandler() {
         startFromOrigin?: boolean;
         initialPrompt?: string;
         replace?: boolean;
+        forceNew?: boolean;
+        threadId?: ThreadId;
       },
     ): Promise<void> => {
       const {
@@ -118,11 +120,12 @@ export function useNewThreadHandler() {
       const storedDraftThreadRef = storedDraftThread
         ? scopeThreadRef(storedDraftThread.environmentId, storedDraftThread.threadId)
         : null;
-      const reusableStoredDraftThread =
-        storedDraftThreadRef && readThreadShell(storedDraftThreadRef) !== null
+      const reusableStoredDraftThread = options?.forceNew
+        ? null
+        : storedDraftThreadRef && readThreadShell(storedDraftThreadRef) !== null
           ? null
           : storedDraftThread;
-      if (storedDraftThreadRef && reusableStoredDraftThread === null) {
+      if (!options?.forceNew && storedDraftThreadRef && reusableStoredDraftThread === null) {
         markPromotedDraftThreadByRef(storedDraftThreadRef);
       }
       const latestActiveDraftThread: DraftThreadState | null = currentRouteTarget
@@ -215,6 +218,7 @@ export function useNewThreadHandler() {
       }
 
       if (
+        !options?.forceNew &&
         latestActiveDraftThread &&
         currentRouteTarget?.kind === "draft" &&
         latestActiveDraftThread.logicalProjectKey === logicalProjectKey &&
@@ -250,7 +254,7 @@ export function useNewThreadHandler() {
       }
 
       const draftId = newDraftId();
-      const threadId = newThreadId();
+      const threadId = options?.threadId ?? newThreadId();
       const createdAt = new Date().toISOString();
       const initialEnvMode = options?.envMode ?? primaryServerSettings.defaultThreadEnvMode;
       return (async () => {

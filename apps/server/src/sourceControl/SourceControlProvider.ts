@@ -2,7 +2,10 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import type {
   ChangeRequest,
+  ChangeRequestReviewComment,
+  ChangeRequestReviewEvent,
   ChangeRequestState,
+  RelevantChangeRequest,
   SourceControlProviderError,
   SourceControlProviderInfo,
   SourceControlProviderKind,
@@ -96,6 +99,20 @@ export class SourceControlProvider extends Context.Service<
       readonly context?: SourceControlProviderContext;
       readonly reference: string;
     }) => Effect.Effect<ChangeRequest, SourceControlProviderError>;
+    readonly listRelevantChangeRequests?: (input: {
+      readonly cwd: string;
+      readonly context?: SourceControlProviderContext;
+      readonly limit?: number;
+    }) => Effect.Effect<ReadonlyArray<RelevantChangeRequest>, SourceControlProviderError>;
+    readonly submitChangeRequestReview?: (input: {
+      readonly cwd: string;
+      readonly context?: SourceControlProviderContext;
+      readonly pullRequestUrl: string;
+      readonly pullRequestNumber: number;
+      readonly event: ChangeRequestReviewEvent;
+      readonly body?: string;
+      readonly comments: ReadonlyArray<ChangeRequestReviewComment>;
+    }) => Effect.Effect<void, SourceControlProviderError>;
     readonly createChangeRequest: (input: {
       readonly cwd: string;
       readonly context?: SourceControlProviderContext;

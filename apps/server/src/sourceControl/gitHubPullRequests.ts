@@ -18,6 +18,18 @@ export interface NormalizedGitHubPullRequestRecord {
   readonly isCrossRepository?: boolean;
   readonly headRepositoryNameWithOwner?: string | null;
   readonly headRepositoryOwnerLogin?: string | null;
+  readonly authorLogin?: string | null;
+  readonly isDraft?: boolean;
+}
+
+export interface NormalizedGitHubSearchPullRequestRecord {
+  readonly number: number;
+  readonly title: string;
+  readonly url: string;
+  readonly repositoryNameWithOwner: string;
+  readonly updatedAt: Option.Option<DateTime.Utc>;
+  readonly authorLogin: string | null;
+  readonly isDraft: boolean;
 }
 
 const GitHubPullRequestSchema = Schema.Struct({
@@ -48,6 +60,32 @@ const GitHubPullRequestSchema = Schema.Struct({
       }),
     ),
   ),
+  author: Schema.optional(
+    Schema.NullOr(
+      Schema.Struct({
+        login: Schema.optional(Schema.NullOr(Schema.String)),
+      }),
+    ),
+  ),
+  isDraft: Schema.optional(Schema.Boolean),
+});
+
+const GitHubSearchPullRequestSchema = Schema.Struct({
+  number: PositiveInt,
+  title: TrimmedNonEmptyString,
+  url: TrimmedNonEmptyString,
+  updatedAt: Schema.optional(Schema.OptionFromNullOr(Schema.DateTimeUtcFromString)),
+  author: Schema.optional(
+    Schema.NullOr(
+      Schema.Struct({
+        login: Schema.optional(Schema.NullOr(Schema.String)),
+      }),
+    ),
+  ),
+  isDraft: Schema.optional(Schema.Boolean),
+  repository: Schema.Struct({
+    nameWithOwner: TrimmedNonEmptyString,
+  }),
 });
 
 function trimOptionalString(value: string | null | undefined): string | null {
@@ -99,12 +137,15 @@ function normalizeGitHubPullRequestRecord(
       : {}),
     ...(headRepositoryNameWithOwner ? { headRepositoryNameWithOwner } : {}),
     ...(headRepositoryOwnerLogin ? { headRepositoryOwnerLogin } : {}),
+    ...(raw.author !== undefined ? { authorLogin: trimOptionalString(raw.author?.login) } : {}),
+    ...(typeof raw.isDraft === "boolean" ? { isDraft: raw.isDraft } : {}),
   };
 }
 
 const decodeGitHubPullRequestList = decodeJsonResult(Schema.Array(Schema.Unknown));
 const decodeGitHubPullRequest = decodeJsonResult(GitHubPullRequestSchema);
 const decodeGitHubPullRequestEntry = Schema.decodeUnknownExit(GitHubPullRequestSchema);
+const decodeGitHubSearchPullRequestEntry = Schema.decodeUnknownExit(GitHubSearchPullRequestSchema);
 
 export const formatGitHubJsonDecodeError = formatSchemaError;
 
@@ -137,4 +178,30 @@ export function decodeGitHubPullRequestJson(
     return Result.succeed(normalizeGitHubPullRequestRecord(result.success));
   }
   return Result.fail(result.failure);
+}
+
+export function decodeGitHubSearchPullRequestListJson(
+  raw: string,
+): Result.Result<
+  ReadonlyArray<NormalizedGitHubSearchPullRequestRecord>,
+  Cause.Cause<Schema.SchemaError>
+> {
+  const result = decodeGitHubPullRequestList(raw);
+  if (Result.isFailure(result)) return Result.fail(result.failure);
+
+  const pullRequests: NormalizedGitHubSearchPullRequestRecord[] = [];
+  for (const entry of result.success) {
+    const decodedEntry = decodeGitHubSearchPullRequestEntry(entry);
+    if (Exit.isFailure(decodedEntry)) continue;
+    pullRequests.push({
+      number: decodedEntry.value.number,
+      title: decodedEntry.value.title,
+      url: decodedEntry.value.url,
+      repositoryNameWithOwner: decodedEntry.value.repository.nameWithOwner,
+      updatedAt: decodedEntry.value.updatedAt ?? Option.none(),
+      authorLogin: trimOptionalString(decodedEntry.value.author?.login),
+      isDraft: decodedEntry.value.isDraft ?? false,
+    });
+  }
+  return Result.succeed(pullRequests);
 }
