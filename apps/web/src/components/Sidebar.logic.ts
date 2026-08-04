@@ -490,6 +490,55 @@ export function sortThreadsForSidebarV2<
   );
 }
 
+export interface ActiveSidebarThreadRow<T> {
+  readonly thread: T;
+  readonly hierarchyRole: "parent" | "child" | null;
+}
+
+/** Keep the existing active-thread sort between groups while placing visible
+ * delegated children directly after a compact parent row. A child whose
+ * parent is outside the current project scope remains a normal standalone
+ * row rather than disappearing. */
+export function groupActiveSidebarThreads<
+  T extends {
+    readonly environmentId: string;
+    readonly id: string;
+    readonly parentThreadId?: string | null | undefined;
+  },
+>(threads: readonly T[]): ActiveSidebarThreadRow<T>[] {
+  const keyFor = (thread: Pick<T, "environmentId" | "id">) =>
+    `${thread.environmentId}:${thread.id}`;
+  const visibleByKey = new Map(threads.map((thread) => [keyFor(thread), thread] as const));
+  const childrenByParent = new Map<string, T[]>();
+  for (const thread of threads) {
+    if (thread.parentThreadId == null) continue;
+    const parentKey = `${thread.environmentId}:${thread.parentThreadId}`;
+    if (!visibleByKey.has(parentKey)) continue;
+    const children = childrenByParent.get(parentKey) ?? [];
+    children.push(thread);
+    childrenByParent.set(parentKey, children);
+  }
+
+  const rows: ActiveSidebarThreadRow<T>[] = [];
+  const emitted = new Set<string>();
+  for (const thread of threads) {
+    const threadKey = keyFor(thread);
+    if (emitted.has(threadKey) || thread.parentThreadId != null) continue;
+    const children = childrenByParent.get(threadKey) ?? [];
+    rows.push({ thread, hierarchyRole: children.length > 0 ? "parent" : null });
+    emitted.add(threadKey);
+    for (const child of children) {
+      rows.push({ thread: child, hierarchyRole: "child" });
+      emitted.add(keyFor(child));
+    }
+  }
+  for (const thread of threads) {
+    if (emitted.has(keyFor(thread))) continue;
+    rows.push({ thread, hierarchyRole: null });
+  }
+  return rows;
+}
+
 /**
  * Search the already-ordered sidebar thread collection by title only.
  * Keeping the input order means lifecycle ordering (active, snoozed, settled)

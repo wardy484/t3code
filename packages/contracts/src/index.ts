@@ -15,6 +15,7 @@ export * from "./model.ts";
 export * from "./keybindings.ts";
 export * from "./jira.ts";
 export * from "./kanban.ts";
+export * from "./delegatedWork.ts";
 export * from "./server.ts";
 export * from "./settings.ts";
 export * from "./git.ts";

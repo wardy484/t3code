@@ -7201,6 +7201,10 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
               modelSelection: defaultModelSelection,
               runtimeMode: "full-access",
               interactionMode: "default",
+              sourceDelegatedWork: {
+                sourceThreadId: defaultThreadId,
+                title: "Bootstrap Thread",
+              },
               bootstrap: {
                 createThread: {
                   projectId: defaultProjectId,
@@ -7236,6 +7240,11 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
             "thread.turn.start",
           ],
         );
+        const createCommand = dispatchedCommands[0];
+        assertTrue(createCommand?.type === "thread.create");
+        if (createCommand?.type === "thread.create") {
+          assert.equal(createCommand.parentThreadId, defaultThreadId);
+        }
         assert.deepEqual(createWorktree.mock.calls[0]?.[0], {
           cwd: "/tmp/project",
           refName: fetchedOriginCommit,

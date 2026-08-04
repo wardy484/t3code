@@ -46,7 +46,7 @@ import {
 import { VcsStatusBroadcaster } from "../../vcs/VcsStatusBroadcaster.ts";
 import { GitWorkflowService } from "../../git/GitWorkflowService.ts";
 import { resolveRequestedWorktreeBranchName } from "../worktreeBranchRequest.ts";
-import { appendJiraWorkStartedContext } from "../jiraTickets.ts";
+import { appendDelegatedWorkStartedContext } from "../delegatedWork.ts";
 const isProviderAdapterRequestError = Schema.is(ProviderAdapterRequestError);
 const isProviderDriverKind = Schema.is(ProviderDriverKind);
 
@@ -1103,10 +1103,18 @@ const make = Effect.gen(function* () {
 
     const sendTurnRequest = yield* buildSendTurnRequestForThread({
       threadId: event.payload.threadId,
-      messageText: appendJiraWorkStartedContext(
-        message.text,
-        event.payload.jiraWorkStartedNotices ?? [],
-      ),
+      messageText: appendDelegatedWorkStartedContext(message.text, [
+        ...(event.payload.delegatedWorkStartedNotices ?? []),
+        ...(event.payload.jiraWorkStartedNotices ?? []).map((notice) => ({
+          title: `${notice.issueKey}: ${notice.issueSummary}`,
+          workThreadId: notice.workThreadId,
+          jiraTicket: {
+            issueKey: notice.issueKey,
+            issueSummary: notice.issueSummary,
+            issueUrl: notice.issueUrl,
+          },
+        })),
+      ]),
       ...(message.attachments !== undefined ? { attachments: message.attachments } : {}),
       ...(event.payload.modelSelection !== undefined
         ? { modelSelection: event.payload.modelSelection }

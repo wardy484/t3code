@@ -40,4 +40,30 @@ describe("deriveJiraTicketRelationships", () => {
 
     expect(relationships.get("KG-3345")?.workThreadId).toBe(workThreadId);
   });
+
+  it("maps a Jira-backed delegated work relationship to its work thread", () => {
+    const workThreadId = ThreadId.make("thread-work");
+    const relationships = deriveJiraTicketRelationships([
+      {
+        id: EventId.make("activity-1"),
+        tone: "info",
+        kind: "delegated-work.started",
+        summary: "Work started on KG-3345",
+        payload: {
+          sourceThreadId: ThreadId.make("thread-source"),
+          title: "KG-3345: Title of ticket",
+          workThreadId,
+          jiraTicket: {
+            issueKey: "KG-3345",
+            issueSummary: "Title of ticket",
+            issueUrl: "https://example.atlassian.net/browse/KG-3345",
+          },
+        },
+        turnId: null,
+        createdAt: "2026-08-04T00:00:00.000Z",
+      },
+    ]);
+
+    expect(relationships.get("KG-3345")?.workThreadId).toBe(workThreadId);
+  });
 });

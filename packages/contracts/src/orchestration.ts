@@ -352,6 +352,7 @@ export type ThreadTitleRegeneration = typeof ThreadTitleRegeneration.Type;
 export const OrchestrationThread = Schema.Struct({
   id: ThreadId,
   projectId: ProjectId,
+  parentThreadId: Schema.optional(Schema.NullOr(ThreadId)),
   title: TrimmedNonEmptyString,
   modelSelection: ModelSelection,
   runtimeMode: RuntimeMode,
@@ -410,6 +411,7 @@ export type OrchestrationProjectShell = typeof OrchestrationProjectShell.Type;
 export const OrchestrationThreadShell = Schema.Struct({
   id: ThreadId,
   projectId: ProjectId,
+  parentThreadId: Schema.optional(Schema.NullOr(ThreadId)),
   title: TrimmedNonEmptyString,
   modelSelection: ModelSelection,
   runtimeMode: RuntimeMode,
@@ -556,6 +558,7 @@ const ThreadCreateCommand = Schema.Struct({
   commandId: CommandId,
   threadId: ThreadId,
   projectId: ProjectId,
+  parentThreadId: Schema.optional(Schema.NullOr(ThreadId)),
   title: TrimmedNonEmptyString,
   modelSelection: ModelSelection,
   runtimeMode: RuntimeMode,
@@ -690,6 +693,41 @@ export const SourceJiraTicketReference = Schema.Struct({
 });
 export type SourceJiraTicketReference = typeof SourceJiraTicketReference.Type;
 
+export const DelegatedWorkJiraTicket = Schema.Struct({
+  issueKey: TrimmedNonEmptyString,
+  issueSummary: TrimmedNonEmptyString,
+  issueUrl: TrimmedNonEmptyString,
+});
+export type DelegatedWorkJiraTicket = typeof DelegatedWorkJiraTicket.Type;
+
+export const SourceDelegatedWorkReference = Schema.Struct({
+  sourceThreadId: ThreadId,
+  title: TrimmedNonEmptyString,
+  jiraTicket: Schema.optional(DelegatedWorkJiraTicket),
+});
+export type SourceDelegatedWorkReference = typeof SourceDelegatedWorkReference.Type;
+
+export const DelegatedWorkStartedNotice = Schema.Struct({
+  title: TrimmedNonEmptyString,
+  workThreadId: ThreadId,
+  jiraTicket: Schema.optional(DelegatedWorkJiraTicket),
+});
+export type DelegatedWorkStartedNotice = typeof DelegatedWorkStartedNotice.Type;
+
+export const DelegatedWorkStartedActivityPayload = Schema.Struct({
+  sourceThreadId: ThreadId,
+  title: TrimmedNonEmptyString,
+  workThreadId: ThreadId,
+  jiraTicket: Schema.optional(DelegatedWorkJiraTicket),
+});
+export type DelegatedWorkStartedActivityPayload = typeof DelegatedWorkStartedActivityPayload.Type;
+
+export const DelegatedWorkNoticeDeliveredActivityPayload = Schema.Struct({
+  workThreadId: ThreadId,
+});
+export type DelegatedWorkNoticeDeliveredActivityPayload =
+  typeof DelegatedWorkNoticeDeliveredActivityPayload.Type;
+
 export const JiraWorkStartedNotice = Schema.Struct({
   issueKey: TrimmedNonEmptyString,
   issueSummary: TrimmedNonEmptyString,
@@ -732,6 +770,7 @@ export const ThreadTurnStartCommand = Schema.Struct({
   ),
   bootstrap: Schema.optional(ThreadTurnStartBootstrap),
   sourceProposedPlan: Schema.optional(SourceProposedPlanReference),
+  sourceDelegatedWork: Schema.optional(SourceDelegatedWorkReference),
   sourceJiraTicket: Schema.optional(SourceJiraTicketReference),
   createdAt: IsoDateTime,
 });
@@ -752,6 +791,7 @@ const ClientThreadTurnStartCommand = Schema.Struct({
   interactionMode: ProviderInteractionMode,
   bootstrap: Schema.optional(ThreadTurnStartBootstrap),
   sourceProposedPlan: Schema.optional(SourceProposedPlanReference),
+  sourceDelegatedWork: Schema.optional(SourceDelegatedWorkReference),
   sourceJiraTicket: Schema.optional(SourceJiraTicketReference),
   createdAt: IsoDateTime,
 });
@@ -1000,6 +1040,7 @@ export const ProjectDeletedPayload = Schema.Struct({
 export const ThreadCreatedPayload = Schema.Struct({
   threadId: ThreadId,
   projectId: ProjectId,
+  parentThreadId: Schema.optional(Schema.NullOr(ThreadId)),
   title: TrimmedNonEmptyString,
   modelSelection: ModelSelection,
   runtimeMode: RuntimeMode.pipe(Schema.withDecodingDefault(Effect.succeed(DEFAULT_RUNTIME_MODE))),
@@ -1109,6 +1150,7 @@ export const ThreadTurnStartRequestedPayload = Schema.Struct({
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_PROVIDER_INTERACTION_MODE)),
   ),
   sourceProposedPlan: Schema.optional(SourceProposedPlanReference),
+  delegatedWorkStartedNotices: Schema.optional(Schema.Array(DelegatedWorkStartedNotice)),
   jiraWorkStartedNotices: Schema.optional(Schema.Array(JiraWorkStartedNotice)),
   createdAt: IsoDateTime,
 });
