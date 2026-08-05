@@ -84,4 +84,11 @@ describe("searchSettings", () => {
       targetId: "appearance",
     });
   });
+
+  it("routes environment file search to the editor", () => {
+    expect(searchSettings("env files")[0]).toMatchObject({
+      id: "environment-files",
+      to: "/settings/environment-files",
+    });
+  });
 });

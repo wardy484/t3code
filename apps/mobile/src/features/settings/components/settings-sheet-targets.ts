@@ -1,5 +1,6 @@
 export type SettingsSheetTarget =
   | "SettingsEnvironments"
+  | "SettingsEnvironmentFiles"
   | "SettingsArchive"
   | "SettingsAppearance"
   | "SettingsClientStorage";

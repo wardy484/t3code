@@ -725,6 +725,19 @@ export function createServerEnvironmentAtoms<R, E>(
       scheduler: configScheduler,
       concurrency: configConcurrency,
     }),
+    readEnvironmentFile: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:read-environment-file",
+      tag: WS_METHODS.environmentFilesRead,
+      concurrency: {
+        mode: "latest",
+        key: ({ environmentId }) => environmentId,
+      },
+    }),
+    writeEnvironmentFile: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:write-environment-file",
+      tag: WS_METHODS.environmentFilesWrite,
+      concurrency: configConcurrency,
+    }),
     signalProcess: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:server:signal-process",
       tag: WS_METHODS.serverSignalProcess,

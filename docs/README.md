@@ -8,6 +8,7 @@
 - [Remote access](./user/remote-access.md)
 - [Keeping app and server in sync](./user/updating.md)
 - [Source control integrations](./user/source-control.md)
+- [Manage environment files](./user/environment-files.md)
 - [Jira Tickets](./user/jira-kanban.md)
 - [Hand off work to another thread](./user/delegated-work.md)
 - [Background service (Linux)](./user/background-service.md)

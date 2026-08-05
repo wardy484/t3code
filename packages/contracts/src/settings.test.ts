@@ -167,6 +167,30 @@ describe("ServerSettings.providerInstances (slice-2 invariant)", () => {
   });
 });
 
+describe("ServerSettings.environmentFiles", () => {
+  it("defaults to an empty list and trims registered file metadata", () => {
+    expect(decodeServerSettings({}).environmentFiles).toEqual([]);
+
+    const patch = decodeServerSettingsPatch({
+      environmentFiles: [
+        {
+          id: "braze",
+          label: "  Braze  ",
+          path: "  /root/.config/codex/braze.env  ",
+        },
+      ],
+    });
+
+    expect(patch.environmentFiles).toEqual([
+      {
+        id: "braze",
+        label: "Braze",
+        path: "/root/.config/codex/braze.env",
+      },
+    ]);
+  });
+});
+
 describe("ServerSettings worktree defaults", () => {
   it("defaults start-from-origin on for legacy configs", () => {
     expect(decodeServerSettings({}).newWorktreesStartFromOrigin).toBe(true);

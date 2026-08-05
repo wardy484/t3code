@@ -18,6 +18,13 @@ import {
   FilesystemBrowseResult,
   FilesystemBrowseError,
 } from "./filesystem.ts";
+import {
+  EnvironmentFileError,
+  EnvironmentFileReadInput,
+  EnvironmentFileReadResult,
+  EnvironmentFileWriteInput,
+  EnvironmentFileWriteResult,
+} from "./environmentFile.ts";
 import { AssetAccessError, AssetCreateUrlInput, AssetCreateUrlResult } from "./assets.ts";
 import {
   GitActionProgressEvent,
@@ -184,6 +191,10 @@ export const WS_METHODS = {
   filesystemBrowse: "filesystem.browse",
   assetsCreateUrl: "assets.createUrl",
 
+  // Registered environment files
+  environmentFilesRead: "environmentFiles.read",
+  environmentFilesWrite: "environmentFiles.write",
+
   // VCS methods
   vcsPull: "vcs.pull",
   vcsRefreshStatus: "vcs.refreshStatus",
@@ -339,6 +350,18 @@ export const WsServerUpdateSettingsRpc = Rpc.make(WS_METHODS.serverUpdateSetting
   payload: Schema.Struct({ patch: ServerSettingsPatch }),
   success: ServerSettings,
   error: Schema.Union([ServerSettingsError, EnvironmentAuthorizationError]),
+});
+
+export const WsEnvironmentFilesReadRpc = Rpc.make(WS_METHODS.environmentFilesRead, {
+  payload: EnvironmentFileReadInput,
+  success: EnvironmentFileReadResult,
+  error: Schema.Union([EnvironmentFileError, EnvironmentAuthorizationError]),
+});
+
+export const WsEnvironmentFilesWriteRpc = Rpc.make(WS_METHODS.environmentFilesWrite, {
+  payload: EnvironmentFileWriteInput,
+  success: EnvironmentFileWriteResult,
+  error: Schema.Union([EnvironmentFileError, EnvironmentAuthorizationError]),
 });
 
 export const WsServerDiscoverSourceControlRpc = Rpc.make(WS_METHODS.serverDiscoverSourceControl, {
@@ -812,6 +835,8 @@ export const WsRpcGroup = RpcGroup.make(
   WsServerRemoveKeybindingRpc,
   WsServerGetSettingsRpc,
   WsServerUpdateSettingsRpc,
+  WsEnvironmentFilesReadRpc,
+  WsEnvironmentFilesWriteRpc,
   WsServerDiscoverSourceControlRpc,
   WsServerGetTraceDiagnosticsRpc,
   WsServerGetProcessDiagnosticsRpc,

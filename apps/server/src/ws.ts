@@ -83,6 +83,7 @@ import * as ServerSelfUpdate from "./cloud/selfUpdate.ts";
 import * as ServerLifecycleEvents from "./serverLifecycleEvents.ts";
 import * as ServerRuntimeStartup from "./serverRuntimeStartup.ts";
 import * as ServerSettings from "./serverSettings.ts";
+import * as EnvironmentFileService from "./environmentFile/EnvironmentFileService.ts";
 import * as TerminalManager from "./terminal/Manager.ts";
 import * as PreviewAutomationBroker from "./mcp/PreviewAutomationBroker.ts";
 import * as PreviewManager from "./preview/Manager.ts";
@@ -345,6 +346,7 @@ const makeWsRpcLayer = (
       const config = yield* ServerConfig.ServerConfig;
       const lifecycleEvents = yield* ServerLifecycleEvents.ServerLifecycleEvents;
       const serverSettings = yield* ServerSettings.ServerSettingsService;
+      const environmentFiles = yield* EnvironmentFileService.make;
       const startup = yield* ServerRuntimeStartup.ServerRuntimeStartup;
       const threadTurnBootstrap = yield* ThreadTurnBootstrap;
       const workspaceEntries = yield* WorkspaceEntries.WorkspaceEntries;
@@ -1191,6 +1193,14 @@ const makeWsRpcLayer = (
               "rpc.aggregate": "server",
             },
           ),
+        [WS_METHODS.environmentFilesRead]: (input) =>
+          observeRpcEffect(WS_METHODS.environmentFilesRead, environmentFiles.read(input), {
+            "rpc.aggregate": "environment-files",
+          }),
+        [WS_METHODS.environmentFilesWrite]: (input) =>
+          observeRpcEffect(WS_METHODS.environmentFilesWrite, environmentFiles.write(input), {
+            "rpc.aggregate": "environment-files",
+          }),
         [WS_METHODS.serverDiscoverSourceControl]: (_input) =>
           observeRpcEffect(
             WS_METHODS.serverDiscoverSourceControl,

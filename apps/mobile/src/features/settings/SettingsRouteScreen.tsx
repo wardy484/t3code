@@ -123,6 +123,7 @@ function LocalSettingsRouteScreen() {
             value={`${environmentCount}`}
             target="SettingsEnvironments"
           />
+          <SettingsRow icon="doc.text" label="Env Files" target="SettingsEnvironmentFiles" />
         </SettingsSection>
 
         <GeneralSettingsSection />
@@ -477,6 +478,7 @@ function ConfiguredSettingsRouteScreen() {
             value={`${environmentCount}`}
             target="SettingsEnvironments"
           />
+          <SettingsRow icon="doc.text" label="Env Files" target="SettingsEnvironmentFiles" />
           <SettingsSwitchRow
             icon="bell.badge"
             label="Device Notifications"

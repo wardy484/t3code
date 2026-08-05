@@ -1,11 +1,13 @@
 import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vite-plus/test";
 
+import { ExecutionEnvironmentCapabilities } from "./environment.ts";
 import { ServerConfig, ServerProvider, ServerUpsertKeybindingResult } from "./server.ts";
 
 const decodeServerProvider = Schema.decodeUnknownSync(ServerProvider);
 const decodeUpsertKeybindingResult = Schema.decodeUnknownSync(ServerUpsertKeybindingResult);
 const decodeAvailableEditors = Schema.decodeUnknownSync(ServerConfig.fields.availableEditors);
+const decodeEnvironmentCapabilities = Schema.decodeUnknownSync(ExecutionEnvironmentCapabilities);
 
 describe("ServerProvider", () => {
   it("defaults capability arrays when decoding provider snapshots", () => {
@@ -100,6 +102,12 @@ describe("ServerProvider", () => {
 });
 
 describe("server config forward compatibility", () => {
+  it("treats env file editing as unsupported when an older server omits it", () => {
+    const parsed = decodeEnvironmentCapabilities({ repositoryIdentity: true });
+
+    expect(parsed.environmentFiles).toBeUndefined();
+  });
+
   it("drops config issues with kinds this build does not know", () => {
     const parsed = decodeUpsertKeybindingResult({
       keybindings: [],
