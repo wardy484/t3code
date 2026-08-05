@@ -8,6 +8,7 @@ import { safeErrorLogAttributes } from "@t3tools/client-runtime/errors";
 import type { ScopedThreadRef, TurnId } from "@t3tools/contracts";
 import {
   ArrowRightIcon,
+  ArrowLeftIcon,
   CheckIcon,
   ChevronDownIcon,
   ChevronRightIcon,
@@ -76,11 +77,16 @@ import { vcsEnvironment } from "../state/vcs";
 import { buildBaseRefChoices, filterBaseRefChoices } from "../lib/baseRefChoices";
 import { buildPullRequestReviewComments } from "../pullRequestReview";
 import { PullRequestReviewDialog } from "./PullRequestReviewDialog";
-import { PullRequestReviewBrief } from "./PullRequestReviewBrief";
+import { PullRequestLayerRail, type PullRequestRailMode } from "./PullRequestLayerRail";
 import {
   selectPullRequestReviewBrief,
   usePullRequestReviewContextStore,
 } from "../pullRequestReviewContextStore";
+import { buildPullRequestLayers } from "../pullRequestLayers";
+import {
+  selectPullRequestLayerThreadState,
+  usePullRequestLayerStateStore,
+} from "../pullRequestLayerStateStore";
 
 type DiffRenderMode = "stacked" | "split";
 type DiffThemeType = "light" | "dark";
@@ -226,6 +232,15 @@ export default function DiffPanel({
     strict: false,
     select: (params) => resolveThreadRouteRef(params),
   });
+  const pullRequestLayerState = usePullRequestLayerStateStore((state) =>
+    selectPullRequestLayerThreadState(state.byThreadKey, routeThreadRef),
+  );
+  const pullRequestRailMode: PullRequestRailMode = pullRequestLayerState.mode;
+  const selectedLayerId = pullRequestLayerState.selectedLayerId;
+  const viewedLayerIds = useMemo(
+    () => new Set(pullRequestLayerState.viewedLayerIds),
+    [pullRequestLayerState.viewedLayerIds],
+  );
   const pullRequestReviewBrief = usePullRequestReviewContextStore((state) =>
     selectPullRequestReviewBrief(state.byThreadKey, routeThreadRef),
   );
@@ -455,20 +470,63 @@ export default function DiffPanel({
       }),
     [collapsedDiffFileKeys, renderableFiles],
   );
+  const pullRequestLayers = useMemo(() => {
+    if (!pullRequestReviewBrief || pullRequestReviewBrief.context.files.length === 0) return [];
+    const commentCountByPath = new Map<string, number>();
+    for (const comment of pullRequestReviewBrief.context.comments) {
+      if (!comment.path) continue;
+      commentCountByPath.set(comment.path, (commentCountByPath.get(comment.path) ?? 0) + 1);
+    }
+    return buildPullRequestLayers(
+      pullRequestReviewBrief.context.files.map((file) => ({
+        path: file.path,
+        additions: file.additions,
+        deletions: file.deletions,
+        commentCount: commentCountByPath.get(file.path) ?? 0,
+      })),
+    );
+  }, [pullRequestReviewBrief]);
+  const activePullRequestLayer =
+    pullRequestLayers.find((layer) => layer.id === selectedLayerId) ?? pullRequestLayers[0] ?? null;
+  const visibleCodeViewFiles = useMemo(() => {
+    if (pullRequestRailMode !== "layers" || !activePullRequestLayer) return codeViewFiles;
+    const paths = new Set(activePullRequestLayer.files.map((file) => file.path));
+    return codeViewFiles.filter((file) => paths.has(file.filePath));
+  }, [activePullRequestLayer, codeViewFiles, pullRequestRailMode]);
   const pullRequestReviewComments = useMemo(
     () => buildPullRequestReviewComments(composerDraft.reviewComments, codeViewFiles),
     [codeViewFiles, composerDraft.reviewComments],
   );
-  const diffFileKeys = useMemo(() => codeViewFiles.map((file) => file.fileKey), [codeViewFiles]);
+  const diffFileKeys = useMemo(
+    () => visibleCodeViewFiles.map((file) => file.fileKey),
+    [visibleCodeViewFiles],
+  );
   const allDiffFilesCollapsed = areAllDiffFilesCollapsed(diffFileKeys, collapsedDiffFileKeys);
-  const diffLineStat = useMemo(() => getDiffLineStat(renderableFiles), [renderableFiles]);
+  const diffLineStat = useMemo(
+    () => getDiffLineStat(visibleCodeViewFiles.map((file) => file.fileDiff)),
+    [visibleCodeViewFiles],
+  );
+
+  useEffect(() => {
+    if (pullRequestLayers.length === 0) {
+      return;
+    }
+    const firstLayerId = pullRequestLayers[0]?.id;
+    if (
+      routeThreadRef &&
+      firstLayerId &&
+      !pullRequestLayers.some((layer) => layer.id === selectedLayerId)
+    ) {
+      usePullRequestLayerStateStore.getState().selectLayer(routeThreadRef, firstLayerId);
+    }
+  }, [pullRequestLayers, routeThreadRef, selectedLayerId]);
 
   useEffect(() => {
     if (!selectedFilePath) return;
-    const file = codeViewFiles.find((candidate) => candidate.filePath === selectedFilePath);
+    const file = visibleCodeViewFiles.find((candidate) => candidate.filePath === selectedFilePath);
     if (!file) return;
     codeViewRef.current?.scrollTo({ type: "item", id: file.fileKey, align: "start" });
-  }, [codeViewFiles, selectedFilePath, selectedFileRevealRequestId]);
+  }, [selectedFilePath, selectedFileRevealRequestId, visibleCodeViewFiles]);
 
   useEffect(() => {
     if (reviewView !== "diff" || requestedReviewFileKey === null) return;
@@ -545,6 +603,33 @@ export default function DiffPanel({
   const selectBranchBaseRef = (baseRef: string | null) => {
     if (!routeThreadRef) return;
     useDiffPanelStore.getState().selectBranchBaseRef(routeThreadRef, baseRef);
+  };
+  const activePullRequestLayerIndex = activePullRequestLayer
+    ? pullRequestLayers.findIndex((layer) => layer.id === activePullRequestLayer.id)
+    : -1;
+  const selectPullRequestLayer = (layerId: string) => {
+    if (!routeThreadRef) return;
+    usePullRequestLayerStateStore.getState().setMode(routeThreadRef, "layers");
+    usePullRequestLayerStateStore.getState().selectLayer(routeThreadRef, layerId);
+  };
+  const selectPullRequestFile = (filePath: string) => {
+    if (routeThreadRef) {
+      usePullRequestLayerStateStore.getState().setMode(routeThreadRef, "files");
+    }
+    const file = codeViewFiles.find((candidate) => candidate.filePath === filePath);
+    if (!file) return;
+    setRequestedReviewFileKey(file.fileKey);
+    setReviewView("diff");
+  };
+  const movePullRequestLayer = (direction: -1 | 1) => {
+    const next = pullRequestLayers[activePullRequestLayerIndex + direction];
+    if (next) selectPullRequestLayer(next.id);
+  };
+  const toggleActiveLayerViewed = () => {
+    if (!activePullRequestLayer || !routeThreadRef) return;
+    usePullRequestLayerStateStore
+      .getState()
+      .toggleViewed(routeThreadRef, activePullRequestLayer.id);
   };
 
   const headerRow = (
@@ -869,7 +954,6 @@ export default function DiffPanel({
 
   return (
     <DiffPanelShell mode={mode} header={headerRow}>
-      {pullRequestReviewBrief ? <PullRequestReviewBrief brief={pullRequestReviewBrief} /> : null}
       {activeThread && activeCwd && currentPullRequest?.state === "open" ? (
         <PullRequestReviewDialog
           open={reviewDialogOpen}
@@ -902,8 +986,73 @@ export default function DiffPanel({
           No completed turns yet.
         </div>
       ) : (
-        <>
+        <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+          {pullRequestReviewBrief && pullRequestLayers.length > 0 && selectedTurnId === null ? (
+            <PullRequestLayerRail
+              brief={pullRequestReviewBrief}
+              layers={pullRequestLayers}
+              mode={pullRequestRailMode}
+              selectedLayerId={activePullRequestLayer?.id ?? null}
+              viewedLayerIds={viewedLayerIds}
+              onModeChange={(nextMode) => {
+                if (routeThreadRef) {
+                  usePullRequestLayerStateStore.getState().setMode(routeThreadRef, nextMode);
+                }
+              }}
+              onSelectLayer={selectPullRequestLayer}
+              onSelectFile={selectPullRequestFile}
+            />
+          ) : null}
           <div className="diff-panel-viewport flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            {pullRequestReviewBrief &&
+            pullRequestRailMode === "layers" &&
+            activePullRequestLayer &&
+            selectedTurnId === null ? (
+              <div className="flex shrink-0 items-start gap-3 border-b border-border/70 bg-background px-3 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold">
+                    Layer {activePullRequestLayerIndex + 1} of {pullRequestLayers.length} ·{" "}
+                    {activePullRequestLayer.title}
+                  </p>
+                  <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                    {activePullRequestLayer.description}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="outline"
+                    disabled={activePullRequestLayerIndex <= 0}
+                    onClick={() => movePullRequestLayer(-1)}
+                  >
+                    <ArrowLeftIcon className="size-3" />
+                    Previous
+                  </Button>
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="outline"
+                    disabled={activePullRequestLayerIndex >= pullRequestLayers.length - 1}
+                    onClick={() => movePullRequestLayer(1)}
+                  >
+                    Next
+                    <ArrowRightIcon className="size-3" />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant={
+                      viewedLayerIds.has(activePullRequestLayer.id) ? "secondary" : "outline"
+                    }
+                    onClick={toggleActiveLayerViewed}
+                  >
+                    <CheckIcon className="size-3" />
+                    {viewedLayerIds.has(activePullRequestLayer.id) ? "Viewed" : "Mark viewed"}
+                  </Button>
+                </div>
+              </div>
+            ) : null}
             {isSelectedPatchTruncated && (
               <p className="shrink-0 border-b border-border/70 bg-muted/40 px-3 py-1.5 text-[11px] text-muted-foreground">
                 This diff was truncated because it exceeded the preview limit. The changes shown are
@@ -941,11 +1090,12 @@ export default function DiffPanel({
                   <div className="mb-1 px-1">
                     <h2 className="text-sm font-semibold">Review overview</h2>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      {codeViewFiles.length} code {codeViewFiles.length === 1 ? "chunk" : "chunks"},
-                      ordered by file path. Open each chunk to review and comment on its lines.
+                      {visibleCodeViewFiles.length} code{" "}
+                      {visibleCodeViewFiles.length === 1 ? "chunk" : "chunks"}, ordered by file
+                      path. Open each chunk to review and comment on its lines.
                     </p>
                   </div>
-                  {codeViewFiles.map(({ fileDiff, filePath, fileKey }) => {
+                  {visibleCodeViewFiles.map(({ fileDiff, filePath, fileKey }) => {
                     const lineStat = getDiffLineStat([fileDiff]);
                     const description =
                       fileDiff.type === "new"
@@ -1017,7 +1167,7 @@ export default function DiffPanel({
                   viewerRef={codeViewRef}
                   key={collapseScopeKey ?? reviewSectionId}
                   className="diff-render-surface h-full min-h-0 overflow-auto"
-                  files={codeViewFiles}
+                  files={visibleCodeViewFiles}
                   sectionId={reviewSectionId}
                   sectionTitle={reviewSectionTitle}
                   composerDraftTarget={composerDraftTarget}
@@ -1085,7 +1235,7 @@ export default function DiffPanel({
               </div>
             )}
           </div>
-        </>
+        </div>
       )}
     </DiffPanelShell>
   );
