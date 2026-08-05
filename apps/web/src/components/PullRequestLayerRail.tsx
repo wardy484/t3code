@@ -43,7 +43,7 @@ export function PullRequestLayerRail({
   const viewedCount = layers.filter((layer) => viewedLayerIds.has(layer.id)).length;
 
   return (
-    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-border/70 bg-background">
+    <aside className="flex h-full w-52 shrink-0 flex-col border-r border-border/70 bg-background">
       <div className="grid grid-cols-2 border-b border-border/70 p-2">
         <Button
           type="button"
@@ -80,6 +80,14 @@ export function PullRequestLayerRail({
             {viewedCount}/{layers.length} viewed
           </span>
         </div>
+        {layers.length >= 3 ? (
+          <div className="mt-2 rounded-md border border-primary/20 bg-primary/[0.05] px-2 py-1.5">
+            <p className="text-[10px] font-semibold text-foreground">Clean split available</p>
+            <p className="mt-0.5 text-[9px] leading-snug text-muted-foreground">
+              These changes already form {layers.length} reviewable soft commits.
+            </p>
+          </div>
+        ) : null}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
@@ -93,7 +101,7 @@ export function PullRequestLayerRail({
                   key={layer.id}
                   type="button"
                   className={cn(
-                    "w-full rounded-lg border px-2.5 py-2.5 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary",
+                    "w-full rounded-lg border px-2.5 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary",
                     selected
                       ? "border-primary bg-primary/[0.06]"
                       : "border-transparent hover:border-border hover:bg-muted/45",
@@ -112,16 +120,11 @@ export function PullRequestLayerRail({
                     >
                       {index + 1}
                     </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-1.5 text-xs font-semibold">
-                        <span className="truncate">{layer.title}</span>
-                        {viewed ? (
-                          <CheckCircle2Icon className="ml-auto size-3.5 shrink-0 text-emerald-600" />
-                        ) : null}
-                      </span>
-                      <span className="mt-0.5 block line-clamp-2 text-[10px] leading-relaxed text-muted-foreground">
-                        {layer.description}
-                      </span>
+                    <span className="flex min-w-0 flex-1 items-center gap-1.5 text-xs font-semibold">
+                      <span className="truncate">{layer.title}</span>
+                      {viewed ? (
+                        <CheckCircle2Icon className="ml-auto size-3.5 shrink-0 text-emerald-600" />
+                      ) : null}
                     </span>
                   </div>
                   <div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground">

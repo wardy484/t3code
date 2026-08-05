@@ -11,6 +11,9 @@ export interface PullRequestLayer {
   readonly id: string;
   readonly title: string;
   readonly description: string;
+  readonly reviewFocus: string;
+  readonly whyTogether: string;
+  readonly suggestedCommit: string;
   readonly risk: PullRequestLayerRisk;
   readonly files: ReadonlyArray<PullRequestLayerFile>;
   readonly additions: number;
@@ -22,6 +25,9 @@ interface LayerDefinition {
   readonly id: string;
   readonly title: string;
   readonly description: string;
+  readonly reviewFocus: string;
+  readonly whyTogether: string;
+  readonly suggestedCommit: string;
   readonly risk: PullRequestLayerRisk;
   readonly matches: (path: string) => boolean;
 }
@@ -34,7 +40,13 @@ const DEFINITIONS: ReadonlyArray<LayerDefinition> = [
   {
     id: "domain",
     title: "Domain rules",
-    description: "Data models and business rules",
+    description:
+      "This slice defines the concepts and business rules the rest of the change depends on. Read it first so later workflow code has a clear meaning.",
+    reviewFocus:
+      "Check that the new states and eligibility rules match the product behaviour, especially edge cases that make a sanction apply or stop applying.",
+    whyTogether:
+      "These files jointly define and persist one business decision. Separating them would make the rule harder to understand in isolation.",
+    suggestedCommit: "feat: define the sanction domain rules",
     risk: "high",
     matches: (path) =>
       !isTestPath(path) &&
@@ -46,7 +58,13 @@ const DEFINITIONS: ReadonlyArray<LayerDefinition> = [
   {
     id: "data",
     title: "Data and schema",
-    description: "Migrations, persistence, and stored data",
+    description:
+      "This slice changes how the feature is represented or retrieved from storage. It establishes the data contract used by the application flow.",
+    reviewFocus:
+      "Check compatibility with existing data, query semantics, indexes, and whether rollback or partial deployment could leave an invalid state.",
+    whyTogether:
+      "The migration, repository, and schema changes form one persistence decision and should be reviewed as a unit.",
+    suggestedCommit: "feat: add persistence for sanction outcomes",
     risk: "high",
     matches: (path) =>
       /(?:^|\/)(?:database|migrations?|schema|persistence|repositories)(?:\/|$)/iu.test(path),
@@ -54,14 +72,26 @@ const DEFINITIONS: ReadonlyArray<LayerDefinition> = [
   {
     id: "tests",
     title: "Tests",
-    description: "Unit, integration, and browser coverage",
+    description:
+      "This slice proves the new behaviour from focused rules through the integrated workflow. Use it as a checklist against the claims made by the implementation.",
+    reviewFocus:
+      "Look for missing failure paths, timing boundaries, state transitions, and assertions that could pass without proving the intended outcome.",
+    whyTogether:
+      "These tests describe the same behaviour at different seams and reveal whether the implementation is safely covered end to end.",
+    suggestedCommit: "test: cover the sanction outcome workflow",
     risk: "low",
     matches: isTestPath,
   },
   {
     id: "supporting",
     title: "Supporting changes",
-    description: "Configuration, documentation, and tooling",
+    description:
+      "This slice updates the configuration, documentation, or tooling needed to support the feature. It should not silently introduce product behaviour.",
+    reviewFocus:
+      "Check that operational defaults are safe, documentation matches the implementation, and unrelated cleanup has not leaked into the PR.",
+    whyTogether:
+      "These files support the main behaviour but can be understood and, if necessary, shipped independently.",
+    suggestedCommit: "chore: update supporting configuration and docs",
     risk: "low",
     matches: (path) =>
       /(?:^|\/)(?:docs?|config|scripts?|\.github)(?:\/|$)/iu.test(path) ||
@@ -100,7 +130,13 @@ export function buildPullRequestLayers(
       {
         id: "workflow",
         title: "Workflow wiring",
-        description: "Application flow and service integration",
+        description:
+          "This slice carries the domain decision through the application flow. It connects handlers, jobs, services, and events so the behaviour actually runs.",
+        reviewFocus:
+          "Trace the happy path and the stop conditions. Pay particular attention to ordering, retries, delayed execution, and whether eligibility is recalculated at the right time.",
+        whyTogether:
+          "These files form one execution path: each hands responsibility to the next. Reviewing them separately would hide control-flow gaps.",
+        suggestedCommit: "feat: wire the sanction execution workflow",
         risk: "medium",
       },
       workflowFiles,
@@ -121,6 +157,9 @@ export function buildPullRequestLayers(
           id: domain.id,
           title: domain.title,
           description: domain.description,
+          reviewFocus: domain.reviewFocus,
+          whyTogether: domain.whyTogether,
+          suggestedCommit: domain.suggestedCommit,
           risk: domain.risk,
         },
         [...domain.files, ...data.files],

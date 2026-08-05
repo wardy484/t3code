@@ -2,7 +2,7 @@ import type { ScopedThreadRef } from "@t3tools/contracts";
 
 import { useDiffPanelStore } from "./diffPanelStore";
 import { useRightPanelStore } from "./rightPanelStore";
-import { expandPreviewPanelForReview } from "./components/preview/PreviewPanelShell";
+import { expandPreviewPanelForReview } from "./previewPanelSizing";
 
 export function openPullRequestReviewWorkspace(
   threadRef: ScopedThreadRef,

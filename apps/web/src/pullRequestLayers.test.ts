@@ -17,6 +17,11 @@ describe("pull request layers", () => {
     ]);
     expect(layers[0]).toMatchObject({ additions: 52, deletions: 3, commentCount: 1 });
     expect(layers[1]?.files.map((file) => file.path)).toEqual(["app/Jobs/ApplySanction.php"]);
+    expect(layers[1]).toMatchObject({
+      reviewFocus: expect.stringContaining("ordering"),
+      whyTogether: expect.stringContaining("execution path"),
+      suggestedCommit: "feat: wire the sanction execution workflow",
+    });
   });
 
   it("keeps configuration separate from application behavior", () => {

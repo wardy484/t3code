@@ -1,30 +1,20 @@
 import { type ReactNode, useEffect, useState } from "react";
 
 import { isElectron } from "~/env";
-import { requestResizableWidth, useResizableWidth } from "~/hooks/useResizableWidth";
+import { useResizableWidth } from "~/hooks/useResizableWidth";
 import { cn } from "~/lib/utils";
+import {
+  getPreviewPanelMaxWidth,
+  PREVIEW_PANEL_DEFAULT_WIDTH,
+  PREVIEW_PANEL_MIN_WIDTH,
+  PREVIEW_PANEL_WIDTH_STORAGE_KEY,
+} from "~/previewPanelSizing";
 
 import { RightPanelResizeHandle } from "./RightPanelResizeHandle";
 
+export { getPreviewPanelMaxWidth } from "~/previewPanelSizing";
+
 export type PreviewPanelMode = "inline" | "sheet" | "sidebar" | "embedded";
-
-const PREVIEW_PANEL_WIDTH_STORAGE_KEY = "t3code:preview-panel-width";
-const PREVIEW_PANEL_MIN_WIDTH = 360;
-/** Fraction of the viewport allowed, preserving the remaining space for chat. */
-const PREVIEW_PANEL_MAX_WIDTH_FRACTION = 0.7;
-const PREVIEW_PANEL_DEFAULT_WIDTH = 540;
-
-export function expandPreviewPanelForReview(): void {
-  if (typeof window === "undefined") return;
-  requestResizableWidth(
-    PREVIEW_PANEL_WIDTH_STORAGE_KEY,
-    Math.floor(window.innerWidth * PREVIEW_PANEL_MAX_WIDTH_FRACTION),
-  );
-}
-
-export function getPreviewPanelMaxWidth(viewportWidth: number): number {
-  return Math.floor(viewportWidth * PREVIEW_PANEL_MAX_WIDTH_FRACTION);
-}
 
 /**
  * Shell for the preview panel. In inline mode the panel is user-resizable

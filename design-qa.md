@@ -1,11 +1,11 @@
 **Comparison target**
 
 - Source visual truth: `/root/.codex/generated_images/019fcf8c-c0a2-7362-86c4-f48adac83146/exec-5aff76b1-52df-4c25-8f33-bf51f05700f8.png`
-- Implementation screenshot: `/tmp/layer-rail-final.png`
+- Implementation screenshot: `/tmp/layer-self-heal.png`
 - Combined comparison: `/tmp/layer-rail-comparison.png`
 - Viewport: 1488 x 1026 CSS px at device scale factor 1
 - Source pixels: 1487 x 1058. Implementation pixels: 1488 x 1026. Both were fit proportionally into equal-width panels for the combined comparison.
-- State: light theme, PR #10682, Workflow wiring selected, one of three layers viewed, real branch diff visible.
+- State: light theme, PR #10682, Domain rules selected, real branch diff and expanded layer context visible.
 
 **Findings**
 
@@ -37,6 +37,7 @@
 - Earlier P2: the review panel retained its compact default width, crushing the rail and diff. Fixed by expanding review workspaces to the existing 70% maximum; post-fix evidence is `/tmp/layer-rail-final.png`.
 - Earlier P2: schema files appeared as a fourth layer in this PR. Fixed by merging data/schema into Domain rules when both are present; post-fix evidence shows three layers.
 - Earlier P2: viewed and selected state were local-only. Fixed with per-thread persisted layer state; post-fix evidence shows Workflow wiring selected and 1/3 viewed after switching modes.
+- Earlier P2: layer explanations were compressed into the navigation rail and became unreadable beside the diff. Fixed by reducing the rail to a table of contents and moving purpose, review focus, file rationale, and suggested soft commit into a full-width context band; post-fix evidence is `/tmp/layer-self-heal.png`.
 
 **Follow-up Polish**
 

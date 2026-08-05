@@ -89,6 +89,7 @@ import {
   selectPullRequestLayerThreadState,
   usePullRequestLayerStateStore,
 } from "../pullRequestLayerStateStore";
+import { expandPreviewPanelForReview } from "../previewPanelSizing";
 
 type DiffRenderMode = "stacked" | "split";
 type DiffThemeType = "light" | "dark";
@@ -324,13 +325,11 @@ export default function DiffPanel({
   const currentPullRequest = gitStatusQuery.data?.pr;
 
   useEffect(() => {
-    if (
-      pullRequestReviewBrief ||
-      !routeThreadRef ||
-      !activeThread ||
-      !activeCwd ||
-      currentPullRequest?.state !== "open"
-    ) {
+    if (pullRequestReviewBrief && routeThreadRef) {
+      expandPreviewPanelForReview();
+      return;
+    }
+    if (!routeThreadRef || !activeThread || !activeCwd || currentPullRequest?.state !== "open") {
       return;
     }
     const requestKey = `${routeThreadRef.environmentId}:${routeThreadRef.threadId}:${currentPullRequest.url}`;
@@ -366,6 +365,7 @@ export default function DiffPanel({
       useDiffPanelStore
         .getState()
         .selectBranchBaseRef(routeThreadRef, `origin/${currentPullRequest.baseRef}`);
+      expandPreviewPanelForReview();
     });
   }, [
     activeCwd,
@@ -1076,48 +1076,76 @@ export default function DiffPanel({
             pullRequestRailMode === "layers" &&
             activePullRequestLayer &&
             selectedTurnId === null ? (
-              <div className="flex shrink-0 items-start gap-3 border-b border-border/70 bg-background px-3 py-2.5">
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold">
-                    Layer {activePullRequestLayerIndex + 1} of {pullRequestLayers.length} ·{" "}
-                    {activePullRequestLayer.title}
-                  </p>
-                  <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                    {activePullRequestLayer.description}
-                  </p>
+              <div className="max-h-64 shrink-0 overflow-y-auto border-b border-border/70 bg-background px-4 py-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-semibold">{activePullRequestLayer.title}</p>
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] capitalize text-muted-foreground">
+                    {activePullRequestLayer.risk} risk
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {activePullRequestLayer.files.length} files · +
+                    {activePullRequestLayer.additions} −{activePullRequestLayer.deletions}
+                  </span>
+                  <div className="ml-auto flex shrink-0 items-center gap-1.5">
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="outline"
+                      disabled={activePullRequestLayerIndex <= 0}
+                      onClick={() => movePullRequestLayer(-1)}
+                    >
+                      <ArrowLeftIcon className="size-3" />
+                      Previous
+                    </Button>
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="outline"
+                      disabled={activePullRequestLayerIndex >= pullRequestLayers.length - 1}
+                      onClick={() => movePullRequestLayer(1)}
+                    >
+                      Next
+                      <ArrowRightIcon className="size-3" />
+                    </Button>
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant={
+                        viewedLayerIds.has(activePullRequestLayer.id) ? "secondary" : "outline"
+                      }
+                      onClick={toggleActiveLayerViewed}
+                    >
+                      <CheckIcon className="size-3" />
+                      {viewedLayerIds.has(activePullRequestLayer.id) ? "Viewed" : "Mark viewed"}
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-1.5">
-                  <Button
-                    type="button"
-                    size="xs"
-                    variant="outline"
-                    disabled={activePullRequestLayerIndex <= 0}
-                    onClick={() => movePullRequestLayer(-1)}
-                  >
-                    <ArrowLeftIcon className="size-3" />
-                    Previous
-                  </Button>
-                  <Button
-                    type="button"
-                    size="xs"
-                    variant="outline"
-                    disabled={activePullRequestLayerIndex >= pullRequestLayers.length - 1}
-                    onClick={() => movePullRequestLayer(1)}
-                  >
-                    Next
-                    <ArrowRightIcon className="size-3" />
-                  </Button>
-                  <Button
-                    type="button"
-                    size="xs"
-                    variant={
-                      viewedLayerIds.has(activePullRequestLayer.id) ? "secondary" : "outline"
-                    }
-                    onClick={toggleActiveLayerViewed}
-                  >
-                    <CheckIcon className="size-3" />
-                    {viewedLayerIds.has(activePullRequestLayer.id) ? "Viewed" : "Mark viewed"}
-                  </Button>
+                <p className="mt-2 max-w-4xl text-xs leading-relaxed text-muted-foreground">
+                  {activePullRequestLayer.description}
+                </p>
+                <div className="mt-3 grid gap-2 min-[900px]:grid-cols-2">
+                  <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-foreground/70">
+                      Review focus
+                    </p>
+                    <p className="mt-1 text-[11px] leading-relaxed text-foreground/85">
+                      {activePullRequestLayer.reviewFocus}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-foreground/70">
+                      Why these files belong together
+                    </p>
+                    <p className="mt-1 text-[11px] leading-relaxed text-foreground/85">
+                      {activePullRequestLayer.whyTogether}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-2 flex min-w-0 items-center gap-2 text-[10px] text-muted-foreground">
+                  <span className="font-semibold text-foreground/70">Suggested soft commit</span>
+                  <code className="truncate rounded bg-muted px-1.5 py-0.5 font-mono text-foreground">
+                    {activePullRequestLayer.suggestedCommit}
+                  </code>
                 </div>
               </div>
             ) : null}
