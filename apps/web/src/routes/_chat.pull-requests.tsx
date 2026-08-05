@@ -125,9 +125,6 @@ function PullRequestActions({
                 },
               })
             : null;
-        if (reviewContext?._tag === "Failure") {
-          throw squashAtomCommandFailure(reviewContext);
-        }
         const prepared = await preparePullRequest.run({
           reference: pullRequest.url,
           mode: "worktree",

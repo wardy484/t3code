@@ -8,7 +8,7 @@ export function PullRequestReviewBrief({ brief }: { readonly brief: PullRequestR
   const [commentsOpen, setCommentsOpen] = useState(brief.context.comments.length > 0);
 
   return (
-    <section className="shrink-0 border-b border-border/70 bg-background">
+    <section className="max-h-[45%] shrink-0 overflow-y-auto border-b border-border/70 bg-background">
       <div className="space-y-3 p-3">
         <div>
           <p className="font-mono text-[11px] text-muted-foreground">

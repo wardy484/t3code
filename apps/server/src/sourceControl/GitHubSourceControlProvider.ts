@@ -296,6 +296,8 @@ export const make = Effect.gen(function* () {
           args: [
             "api",
             `repos/${repository}/pulls/${input.pullRequestNumber}/comments?per_page=100`,
+            "--paginate",
+            "--slurp",
           ],
         }),
       ],

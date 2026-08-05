@@ -28,15 +28,18 @@ describe("GitHub review context", () => {
         files: [{ path: "src/review.ts", additions: 12, deletions: 3 }],
       }),
       JSON.stringify([
-        {
-          id: 3,
-          user: { login: "reviewer" },
-          body: "What handles null?",
-          created_at: "2026-08-03T00:00:00Z",
-          html_url: "https://example.test/3",
-          path: "src/review.ts",
-          line: 42,
-        },
+        [
+          {
+            id: 3,
+            user: { login: "reviewer" },
+            body: "What handles null?",
+            created_at: "2026-08-03T00:00:00Z",
+            html_url: "https://example.test/3",
+            path: "src/review.ts",
+            line: 42,
+          },
+        ],
+        [],
       ]),
     );
 

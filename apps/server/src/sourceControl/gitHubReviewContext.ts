@@ -36,18 +36,20 @@ const PullRequestView = Schema.Struct({
   ),
 });
 
-const InlineComments = Schema.Array(
-  Schema.Struct({
-    id: Schema.Number,
-    user: Author,
-    body: Schema.String,
-    created_at: Schema.optional(Schema.NullOr(Schema.String)),
-    html_url: Schema.optional(Schema.NullOr(Schema.String)),
-    path: Schema.optional(Schema.NullOr(Schema.String)),
-    line: Schema.optional(Schema.NullOr(Schema.Number)),
-    original_line: Schema.optional(Schema.NullOr(Schema.Number)),
-  }),
-);
+const InlineComment = Schema.Struct({
+  id: Schema.Number,
+  user: Author,
+  body: Schema.String,
+  created_at: Schema.optional(Schema.NullOr(Schema.String)),
+  html_url: Schema.optional(Schema.NullOr(Schema.String)),
+  path: Schema.optional(Schema.NullOr(Schema.String)),
+  line: Schema.optional(Schema.NullOr(Schema.Number)),
+  original_line: Schema.optional(Schema.NullOr(Schema.Number)),
+});
+const InlineComments = Schema.Union([
+  Schema.Array(InlineComment),
+  Schema.Array(Schema.Array(InlineComment)),
+]);
 
 const decodeView = decodeJsonResult(PullRequestView);
 const decodeInline = decodeJsonResult(InlineComments);
@@ -62,6 +64,7 @@ export function decodeGitHubReviewContext(
   if (Result.isFailure(view)) return Result.fail(view.failure);
   const inline = decodeInline(inlineCommentsJson);
   if (Result.isFailure(inline)) return Result.fail(inline.failure);
+  const inlineComments = inline.success.flatMap((page) => (Array.isArray(page) ? page : [page]));
 
   const comments: PullRequestReviewContext["comments"] = [
     ...(view.success.comments ?? []).map((comment) => ({
@@ -88,7 +91,7 @@ export function decodeGitHubReviewContext(
         line: null,
         state: text(review.state),
       })),
-    ...inline.success.map((comment) => ({
+    ...inlineComments.map((comment) => ({
       id: String(comment.id),
       kind: "inline" as const,
       authorLogin: text(comment.user?.login),
