@@ -40,8 +40,8 @@ T3 Code works with the platforms your team already uses:
 - On web and desktop, open **Pull requests** below **Tickets** to see open GitHub PRs you authored or that request your review
 - Filter the inbox by repository, or select **My work** to show only PRs you authored
 - Select **Review** to check out the PR in a dedicated worktree and open its branch diff beside the conversation
-- The review panel shows the PR description, existing discussion, changed-file overview, and branch diff before the agent review runs
-- The agent then adds a suggested code-reading order, risks, and whether the change should have been split into smaller PRs
+- The compact review panel keeps the code visible and lets you expand the PR description, existing discussion, or changed-file overview only when needed
+- The agent starts with a five-bullet review card, then waits for you to choose a guided skim, comments, risks/tests, or a split assessment
 - Select **Show me** to ask the agent to run and demonstrate the change; T3 Code uses the `$show-me` skill when the selected provider exposes it and otherwise sends the same request as a normal prompt
 - See if your current branch already has an open PR/MR
 - Open the review directly in your browser with one click

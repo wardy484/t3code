@@ -111,7 +111,18 @@ export function buildPullRequestThreadPrompt(
   if (!input.showMe) {
     return [
       ...context,
-      "Inspect the pull request description and diff, run relevant verification, and report confirmed review findings with file and line references.",
+      "Help me review this pull request myself; do not replace the review with only an LLM verdict.",
+      "",
+      "Fetch the live PR description, existing discussion, review state, and changed-file list from GitHub, then inspect the diff.",
+      "",
+      "Your FIRST response must be a review card of at most 180 words. Use exactly these five bullets:",
+      "- What changed — one plain-English sentence.",
+      "- Why — one sentence grounded in the PR description.",
+      "- Start here — the single best file for me to skim first, with why.",
+      "- Watch out — the highest-risk behavior or 'Nothing obvious yet'.",
+      "- PR size — 'Cohesive' or 'Should be split', followed by one sentence. If split, name the concrete boundary and whether it would have been easy before submission. Describe review cost, but do not infer developer motivation.",
+      "",
+      "Then stop. End with: 'Choose: Guided skim · Existing comments · Risks/tests · Split assessment'. Do not include a full walkthrough, findings catalogue, long prose, or more than five bullets until I choose. Explicitly say if GitHub context could not be fetched. The code diff is open beside the conversation; guide me through one file at a time instead of summarizing the code away.",
     ].join("\n");
   }
 

@@ -4,22 +4,27 @@ import type { PullRequestReviewBrief as PullRequestReviewBriefData } from "../pu
 import { DiffStatLabel } from "./chat/DiffStatLabel";
 
 export function PullRequestReviewBrief({ brief }: { readonly brief: PullRequestReviewBriefData }) {
-  const [descriptionOpen, setDescriptionOpen] = useState(true);
-  const [commentsOpen, setCommentsOpen] = useState(brief.context.comments.length > 0);
+  const [descriptionOpen, setDescriptionOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [filesOpen, setFilesOpen] = useState(false);
 
   return (
     <section className="max-h-[45%] shrink-0 overflow-y-auto border-b border-border/70 bg-background">
-      <div className="space-y-3 p-3">
-        <div>
-          <p className="font-mono text-[11px] text-muted-foreground">
-            {brief.repositoryNameWithOwner}#{brief.number}
-          </p>
-          <h2 className="mt-1 text-sm font-semibold leading-snug">{brief.title}</h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {brief.context.files.length} changed{" "}
-            {brief.context.files.length === 1 ? "file" : "files"}
-            {` · ${brief.context.comments.length} existing ${brief.context.comments.length === 1 ? "comment" : "comments"}`}
-          </p>
+      <div className="space-y-2 p-3">
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="font-mono text-[11px] text-muted-foreground">
+              {brief.repositoryNameWithOwner}#{brief.number}
+            </p>
+            <h2 className="mt-0.5 truncate text-sm font-semibold" title={brief.title}>
+              {brief.title}
+            </h2>
+          </div>
+          <div className="shrink-0 rounded-md bg-muted px-2 py-1 text-right text-[11px] leading-tight">
+            <strong>{brief.context.files.length}</strong> files
+            <span className="mx-1 text-muted-foreground">·</span>
+            <strong>{brief.context.comments.length}</strong> comments
+          </div>
         </div>
 
         <details
@@ -85,11 +90,14 @@ export function PullRequestReviewBrief({ brief }: { readonly brief: PullRequestR
           </div>
         </details>
 
-        <div>
-          <h3 className="flex items-center gap-1.5 text-xs font-semibold">
+        <details open={filesOpen} onToggle={(event) => setFilesOpen(event.currentTarget.open)}>
+          <summary className="flex cursor-pointer list-none items-center gap-1.5 text-xs font-semibold">
+            <ChevronRightIcon
+              className={`size-3 transition-transform ${filesOpen ? "rotate-90" : ""}`}
+            />
             <FileCodeIcon className="size-3" />
-            Changed files
-          </h3>
+            Changed files ({brief.context.files.length})
+          </summary>
           <div className="mt-2 max-h-48 space-y-1 overflow-y-auto">
             {brief.context.files.map((file) => (
               <div
@@ -108,7 +116,7 @@ export function PullRequestReviewBrief({ brief }: { readonly brief: PullRequestR
               </div>
             ))}
           </div>
-        </div>
+        </details>
       </div>
     </section>
   );

@@ -177,6 +177,23 @@ describe("pull request inbox", () => {
     expect(withSkill).toContain("<!-- t3-source-pull-request:");
   });
 
+  it("asks the reviewer to present GitHub context and guide a human code skim", () => {
+    const prompt = buildPullRequestThreadPrompt(pullRequest, {
+      showMe: false,
+      showMeSkillAvailable: false,
+    });
+
+    expect(prompt).toContain("do not replace the review with only an LLM verdict");
+    expect(prompt).toContain("live PR description");
+    expect(prompt).toContain("at most 180 words");
+    expect(prompt).toContain("Use exactly these five bullets");
+    expect(prompt).toContain("Start here");
+    expect(prompt).toContain("Should be split");
+    expect(prompt).toContain("whether it would have been easy before submission");
+    expect(prompt).toContain("do not infer developer motivation");
+    expect(prompt).toContain("Then stop");
+    expect(prompt).toContain("guide me through one file at a time");
+  });
   it("recognizes enabled show-me skill variants", () => {
     expect(hasShowMeSkill([{ enabled: true, skills: [{ name: "show-me", enabled: true }] }])).toBe(
       true,
