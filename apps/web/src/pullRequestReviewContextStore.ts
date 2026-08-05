@@ -1,8 +1,6 @@
 import { scopedThreadKey } from "@t3tools/client-runtime/environment";
 import type { PullRequestReviewContext, ScopedThreadRef } from "@t3tools/contracts";
 import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
-import { resolveStorage } from "./lib/storage";
 
 export interface PullRequestReviewBrief {
   readonly number: number;
@@ -17,34 +15,13 @@ interface PullRequestReviewContextState {
   readonly set: (threadRef: ScopedThreadRef, brief: PullRequestReviewBrief) => void;
 }
 
-const MAX_PERSISTED_REVIEW_CONTEXTS = 20;
-
-export const usePullRequestReviewContextStore = create<PullRequestReviewContextState>()(
-  persist(
-    (set) => ({
-      byThreadKey: {},
-      set: (threadRef, brief) =>
-        set((state) => {
-          const entries = Object.entries(state.byThreadKey).filter(
-            ([key]) => key !== scopedThreadKey(threadRef),
-          );
-          return {
-            byThreadKey: Object.fromEntries([
-              ...entries.slice(-(MAX_PERSISTED_REVIEW_CONTEXTS - 1)),
-              [scopedThreadKey(threadRef), brief],
-            ]),
-          };
-        }),
-    }),
-    {
-      name: "t3code:pull-request-review-context:v1",
-      storage: createJSONStorage(() =>
-        resolveStorage(typeof window !== "undefined" ? window.localStorage : undefined),
-      ),
-      partialize: (state) => ({ byThreadKey: state.byThreadKey }),
-    },
-  ),
-);
+export const usePullRequestReviewContextStore = create<PullRequestReviewContextState>()((set) => ({
+  byThreadKey: {},
+  set: (threadRef, brief) =>
+    set((state) => ({
+      byThreadKey: { ...state.byThreadKey, [scopedThreadKey(threadRef)]: brief },
+    })),
+}));
 
 export function selectPullRequestReviewBrief(
   byThreadKey: Record<string, PullRequestReviewBrief>,

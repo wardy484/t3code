@@ -161,6 +161,68 @@ it.effect("uses gh json listing for non-open change request state queries", () =
   }),
 );
 
+it.effect("fetches and combines the complete pull request review context", () =>
+  Effect.gen(function* () {
+    const calls: Array<ReadonlyArray<string>> = [];
+    const provider = yield* makeProvider({
+      execute: (input) => {
+        calls.push(input.args);
+        return Effect.succeed(
+          processResult(
+            input.args[0] === "pr"
+              ? JSON.stringify({
+                  body: "Why this changed",
+                  comments: [],
+                  reviews: [],
+                  files: [{ path: "src/review.ts", additions: 2, deletions: 1 }],
+                })
+              : JSON.stringify([
+                  [
+                    {
+                      id: 7,
+                      user: { login: "reviewer" },
+                      body: "Please handle null",
+                      path: "src/review.ts",
+                      line: 12,
+                    },
+                  ],
+                ]),
+          ),
+        );
+      },
+    });
+
+    const context = yield* provider.getPullRequestReviewContext!({
+      cwd: "/repo",
+      pullRequestUrl: "https://github.com/pingdotgg/t3code/pull/42",
+      pullRequestNumber: 42,
+    });
+
+    assert.deepStrictEqual(calls, [
+      [
+        "pr",
+        "view",
+        "https://github.com/pingdotgg/t3code/pull/42",
+        "--json",
+        "body,comments,reviews,files",
+      ],
+      ["api", "repos/pingdotgg/t3code/pulls/42/comments?per_page=100", "--paginate", "--slurp"],
+    ]);
+    assert.strictEqual(context.body, "Why this changed");
+    assert.deepStrictEqual(context.comments[0], {
+      id: "7",
+      kind: "inline",
+      authorLogin: "reviewer",
+      body: "Please handle null",
+      createdAt: null,
+      url: null,
+      path: "src/review.ts",
+      line: 12,
+      state: null,
+    });
+  }),
+);
+
 it.effect("treats empty non-open change request listing output as no results", () =>
   Effect.gen(function* () {
     const provider = yield* makeProvider({
