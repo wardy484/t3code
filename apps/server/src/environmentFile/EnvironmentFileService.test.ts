@@ -103,6 +103,9 @@ describe("EnvironmentFileService", () => {
       );
 
       expect(error.failure).toBe("revision-conflict");
+      expect(error.message).toBe(
+        "This secret file changed outside T3 Code. Reload it before saving.",
+      );
       expect(yield* fs.readFileString(filePath)).toBe("BRAZE_API_KEY=external\n");
     }).pipe(Effect.provide(NodeServices.layer)),
   );

@@ -3,7 +3,7 @@ export type SettingsPath =
   | "/settings/appearance"
   | "/settings/keybindings"
   | "/settings/providers"
-  | "/settings/environment-files"
+  | "/settings/secrets"
   | "/settings/source-control"
   | "/settings/integrations"
   | "/settings/connections"
@@ -26,7 +26,7 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/appearance": "Appearance",
   "/settings/keybindings": "Keybindings",
   "/settings/providers": "Providers",
-  "/settings/environment-files": "Env files",
+  "/settings/secrets": "Secrets",
   "/settings/source-control": "Source Control",
   "/settings/integrations": "Integrations",
   "/settings/connections": "Connections",
@@ -141,9 +141,9 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/providers",
   },
   {
-    id: "environment-files",
-    title: "Env files",
-    to: "/settings/environment-files",
+    id: "secrets",
+    title: "Secrets",
+    to: "/settings/secrets",
   },
   {
     id: "source-control",

@@ -108,14 +108,14 @@ function AddEnvironmentFileDialog({
         if (isAtomCommandInterrupted(result)) return;
         toastManager.add({
           type: "error",
-          title: "Could not add env file",
+          title: "Could not add secret file",
           description: errorMessage(squashAtomCommandFailure(result), "The file was not added."),
         });
         return;
       }
       toastManager.add({
         type: "success",
-        title: "Env file added",
+        title: "Secret file added",
         description: normalizedPath,
       });
       close();
@@ -131,7 +131,7 @@ function AddEnvironmentFileDialog({
     >
       <DialogPopup>
         <DialogHeader>
-          <DialogTitle>Add env file</DialogTitle>
+          <DialogTitle>Add secret file</DialogTitle>
           <DialogDescription>
             Register an existing file on {primaryEnvironment?.label ?? "this environment"}.
           </DialogDescription>
@@ -253,7 +253,7 @@ export function EnvironmentFilesSettings() {
 
   const selectFile = (nextId: string | null) => {
     if (!nextId || nextId === selectedId) return;
-    if (isDirty && !window.confirm("Discard your unsaved env file changes?")) return;
+    if (isDirty && !window.confirm("Discard your unsaved secret changes?")) return;
     clearEditor();
     setSelectedId(EnvironmentFileId.make(nextId));
   };
@@ -275,7 +275,7 @@ export function EnvironmentFilesSettings() {
         if (isAtomCommandInterrupted(result)) return;
         toastManager.add({
           type: "error",
-          title: "Could not open env file",
+          title: "Could not open secret file",
           description: errorMessage(squashAtomCommandFailure(result), "The file was not opened."),
         });
         return;
@@ -305,13 +305,13 @@ export function EnvironmentFilesSettings() {
         if (isAtomCommandInterrupted(result)) return;
         toastManager.add({
           type: "error",
-          title: "Could not save env file",
+          title: "Could not save secret file",
           description: errorMessage(squashAtomCommandFailure(result), "The file was not saved."),
         });
         return;
       }
       setSnapshot({ contents: draft, revision: result.value.revision, mode: result.value.mode });
-      toastManager.add({ type: "success", title: "Env file saved" });
+      toastManager.add({ type: "success", title: "Secret file saved" });
     })();
   };
 
@@ -332,7 +332,7 @@ export function EnvironmentFilesSettings() {
         if (isAtomCommandInterrupted(result)) return;
         toastManager.add({
           type: "error",
-          title: "Could not untrack env file",
+          title: "Could not untrack secret file",
           description: errorMessage(
             squashAtomCommandFailure(result),
             "The file is still registered.",
@@ -344,7 +344,7 @@ export function EnvironmentFilesSettings() {
       setSelectedId(remaining[0]?.id ?? null);
       toastManager.add({
         type: "success",
-        title: "Env file untracked",
+        title: "Secret file untracked",
         description: "The file was not deleted from the environment host.",
       });
     })();
@@ -353,8 +353,8 @@ export function EnvironmentFilesSettings() {
   return (
     <SettingsPageContainer>
       <SettingsSection
-        id="environment-files"
-        title="Env files"
+        id="secrets"
+        title="Secrets"
         icon={<FileKey2Icon className="size-5" />}
         headerAction={
           <Button
@@ -373,12 +373,12 @@ export function EnvironmentFilesSettings() {
             <div className="rounded-lg border border-dashed border-border px-4 py-10 text-center">
               <p className="text-sm font-medium text-foreground">Server update required</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Update this environment's T3 Code server to manage env files.
+                Update this environment's T3 Code server to manage secrets.
               </p>
             </div>
           ) : files.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border px-4 py-10 text-center">
-              <p className="text-sm font-medium text-foreground">No env files added</p>
+              <p className="text-sm font-medium text-foreground">No secret files added</p>
               <p className="mt-1 text-xs text-muted-foreground">
                 Add an existing file path from this environment.
               </p>

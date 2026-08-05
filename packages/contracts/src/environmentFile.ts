@@ -70,23 +70,23 @@ export class EnvironmentFileError extends Schema.TaggedErrorClass<EnvironmentFil
   override get message(): string {
     switch (this.failure) {
       case "not-registered":
-        return "This environment file is no longer registered.";
+        return "This secret file is no longer registered.";
       case "path-not-absolute":
-        return "Environment file paths must be absolute paths on the environment host.";
+        return "Secret file paths must be absolute paths on the environment host.";
       case "not-found":
-        return "The registered environment file does not exist.";
+        return "The registered secret file does not exist.";
       case "not-file":
-        return "The registered environment file path is not a regular file.";
+        return "The registered secret file path is not a regular file.";
       case "too-large":
-        return "Environment files larger than 1 MB cannot be edited in T3 Code.";
+        return "Secret files larger than 1 MB cannot be edited in T3 Code.";
       case "binary":
-        return "Binary files cannot be edited as environment files.";
+        return "Binary files cannot be edited as secret files.";
       case "revision-conflict":
-        return "This environment file changed outside T3 Code. Reload it before saving.";
+        return "This secret file changed outside T3 Code. Reload it before saving.";
       case "read-failed":
-        return "T3 Code could not read this environment file.";
+        return "T3 Code could not read this secret file.";
       case "write-failed":
-        return "T3 Code could not save this environment file.";
+        return "T3 Code could not save this secret file.";
     }
   }
 }

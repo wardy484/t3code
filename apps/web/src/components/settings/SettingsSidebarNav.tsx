@@ -52,7 +52,7 @@ const SETTINGS_SECTION_ICONS: Readonly<
   "/settings/appearance": PaletteIcon,
   "/settings/keybindings": KeyboardIcon,
   "/settings/providers": BotIcon,
-  "/settings/environment-files": FileKey2Icon,
+  "/settings/secrets": FileKey2Icon,
   "/settings/source-control": GitBranchIcon,
   "/settings/integrations": PlugIcon,
   "/settings/connections": Link2Icon,

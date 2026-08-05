@@ -154,7 +154,7 @@ export function SettingsEnvironmentFilesRouteScreen() {
   }, [environmentId]);
 
   usePreventRemove(isDirty && !allowRemovalRef.current, ({ data }) => {
-    Alert.alert("Discard env file changes?", "Your unsaved changes will be lost.", [
+    Alert.alert("Discard secret changes?", "Your unsaved changes will be lost.", [
       { text: "Keep editing", style: "cancel" },
       {
         text: "Discard",
@@ -173,7 +173,7 @@ export function SettingsEnvironmentFilesRouteScreen() {
       action();
       return;
     }
-    Alert.alert("Discard env file changes?", "Your unsaved changes will be lost.", [
+    Alert.alert("Discard secret changes?", "Your unsaved changes will be lost.", [
       { text: "Keep editing", style: "cancel" },
       { text: "Discard", style: "destructive", onPress: action },
     ]);
@@ -220,7 +220,7 @@ export function SettingsEnvironmentFilesRouteScreen() {
       if (result._tag === "Failure") {
         if (!isAtomCommandInterrupted(result)) {
           Alert.alert(
-            "Could not add env file",
+            "Could not add secret file",
             message(squashAtomCommandFailure(result), "The file was not added."),
           );
         }
@@ -244,7 +244,7 @@ export function SettingsEnvironmentFilesRouteScreen() {
       if (result._tag === "Failure") {
         if (!isAtomCommandInterrupted(result)) {
           Alert.alert(
-            "Could not open env file",
+            "Could not open secret file",
             message(squashAtomCommandFailure(result), "The file was not opened."),
           );
         }
@@ -274,7 +274,7 @@ export function SettingsEnvironmentFilesRouteScreen() {
       if (result._tag === "Failure") {
         if (!isAtomCommandInterrupted(result)) {
           Alert.alert(
-            "Could not save env file",
+            "Could not save secret file",
             message(squashAtomCommandFailure(result), "The file was not saved."),
           );
         }
@@ -285,14 +285,14 @@ export function SettingsEnvironmentFilesRouteScreen() {
         revision: result.value.revision,
         mode: result.value.mode,
       });
-      Alert.alert("Env file saved");
+      Alert.alert("Secret file saved");
     })();
   };
 
   const untrack = () => {
     if (!environmentId || !selectedFile || operation) return;
     Alert.alert(
-      "Untrack env file?",
+      "Untrack secret file?",
       `${isDirty ? "Your unsaved changes will be discarded. " : ""}This removes it from T3 Code. The file will not be deleted from the environment host.`,
       [
         { text: "Cancel", style: "cancel" },
@@ -313,7 +313,7 @@ export function SettingsEnvironmentFilesRouteScreen() {
               if (result._tag === "Failure") {
                 if (!isAtomCommandInterrupted(result)) {
                   Alert.alert(
-                    "Could not untrack env file",
+                    "Could not untrack secret file",
                     message(squashAtomCommandFailure(result), "The file is still registered."),
                   );
                 }
@@ -339,7 +339,7 @@ export function SettingsEnvironmentFilesRouteScreen() {
       >
         {environments.length === 0 ? (
           <Text className="rounded-[24px] bg-card px-5 py-8 text-center text-foreground-muted">
-            Connect an environment before adding env files.
+            Connect an environment before adding secret files.
           </Text>
         ) : (
           <>
@@ -360,7 +360,7 @@ export function SettingsEnvironmentFilesRouteScreen() {
 
             {!isSupported ? (
               <Text className="rounded-[24px] bg-card px-5 py-8 text-center text-foreground-muted">
-                Update this environment's T3 Code server to manage env files.
+                Update this environment's T3 Code server to manage secrets.
               </Text>
             ) : (
               <>
@@ -392,7 +392,7 @@ export function SettingsEnvironmentFilesRouteScreen() {
                 <SettingsSection title="Files" card>
                   {files.length === 0 ? (
                     <Text className="px-4 py-6 text-center text-foreground-muted">
-                      No env files added.
+                      No secret files added.
                     </Text>
                   ) : (
                     files.map((file) => (

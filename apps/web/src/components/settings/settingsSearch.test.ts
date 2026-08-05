@@ -85,10 +85,10 @@ describe("searchSettings", () => {
     });
   });
 
-  it("routes environment file search to the editor", () => {
-    expect(searchSettings("env files")[0]).toMatchObject({
-      id: "environment-files",
-      to: "/settings/environment-files",
+  it("routes secret search to the editor", () => {
+    expect(searchSettings("secrets")[0]).toMatchObject({
+      id: "secrets",
+      to: "/settings/secrets",
     });
   });
 });

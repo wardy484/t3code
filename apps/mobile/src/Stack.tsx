@@ -157,9 +157,9 @@ const SettingsSheetStack = createNativeStackNavigator({
     }),
     SettingsEnvironmentFiles: createNativeStackScreen({
       screen: SettingsEnvironmentFilesRouteScreen,
-      linking: "environment-files",
+      linking: "secrets",
       options: {
-        title: "Env Files",
+        title: "Secrets",
       },
     }),
     SettingsEnvironmentNew: createNativeStackScreen({

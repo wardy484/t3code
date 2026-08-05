@@ -1,10 +1,10 @@
-# Manage environment files
+# Manage secrets
 
-T3 Code can track and edit existing text-based environment files on the machine running your T3 Code server. This is useful for `.env` files and other small secret files that your tools already load.
+T3 Code can track and edit existing text-based secret files on the machine running your T3 Code server. This is useful for `.env` files and other small secret files that your tools already load.
 
 ## Add a file
 
-1. Open **Settings → Env files**.
+1. Open **Settings → Secrets**.
 2. Choose **Add file**.
 3. Enter a name and the absolute path on the environment host, then save.
 
@@ -21,4 +21,4 @@ T3 Code does not automatically load or source the file. A tool that uses it may 
 - Only registered absolute paths can be opened.
 - Files must be regular text files no larger than 1 MB.
 - **Untrack** removes the path from T3 Code but never deletes the file.
-- Env file management is available in the web, desktop, and mobile clients.
+- Secret management is available in the web, desktop, and mobile clients.
