@@ -1547,6 +1547,12 @@ const makeWsRpcLayer = (
             gitWorkflow.listRelevantPullRequests(input),
             { "rpc.aggregate": "git" },
           ),
+        [WS_METHODS.gitGetPullRequestReviewContext]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.gitGetPullRequestReviewContext,
+            gitWorkflow.getPullRequestReviewContext(input),
+            { "rpc.aggregate": "git" },
+          ),
         [WS_METHODS.gitSubmitPullRequestReview]: (input) =>
           observeRpcEffect(
             WS_METHODS.gitSubmitPullRequestReview,

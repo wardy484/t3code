@@ -18,6 +18,8 @@ import {
   type GitPreparePullRequestThreadResult,
   type GitListRelevantPullRequestsInput,
   type GitListRelevantPullRequestsResult,
+  type GitGetPullRequestReviewContextInput,
+  type GitGetPullRequestReviewContextResult,
   type GitSubmitPullRequestReviewInput,
   type GitSubmitPullRequestReviewResult,
   type GitPullRequestRefInput,
@@ -63,6 +65,9 @@ export class GitWorkflowService extends Context.Service<
     readonly listRelevantPullRequests: (
       input: GitListRelevantPullRequestsInput,
     ) => Effect.Effect<GitListRelevantPullRequestsResult, GitManagerServiceError>;
+    readonly getPullRequestReviewContext: (
+      input: GitGetPullRequestReviewContextInput,
+    ) => Effect.Effect<GitGetPullRequestReviewContextResult, GitManagerServiceError>;
     readonly submitPullRequestReview: (
       input: GitSubmitPullRequestReviewInput,
     ) => Effect.Effect<GitSubmitPullRequestReviewResult, GitManagerServiceError>;
@@ -298,6 +303,10 @@ export const make = Effect.gen(function* () {
     listRelevantPullRequests: routeGitManager(
       "GitWorkflowService.listRelevantPullRequests",
       gitManager.listRelevantPullRequests,
+    ),
+    getPullRequestReviewContext: routeGitManager(
+      "GitWorkflowService.getPullRequestReviewContext",
+      gitManager.getPullRequestReviewContext,
     ),
     submitPullRequestReview: routeGitManager(
       "GitWorkflowService.submitPullRequestReview",

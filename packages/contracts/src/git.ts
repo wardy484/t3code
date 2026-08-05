@@ -4,6 +4,7 @@ import {
   ChangeRequestReviewComment,
   ChangeRequestReviewEvent,
   RelevantChangeRequest,
+  PullRequestReviewContext,
   SourceControlProviderError,
   SourceControlProviderInfo,
 } from "./sourceControl.ts";
@@ -161,6 +162,13 @@ export const GitListRelevantPullRequestsInput = Schema.Struct({
 });
 export type GitListRelevantPullRequestsInput = typeof GitListRelevantPullRequestsInput.Type;
 
+export const GitGetPullRequestReviewContextInput = Schema.Struct({
+  cwd: TrimmedNonEmptyStringSchema,
+  pullRequestUrl: TrimmedNonEmptyStringSchema,
+  pullRequestNumber: PositiveInt,
+});
+export type GitGetPullRequestReviewContextInput = typeof GitGetPullRequestReviewContextInput.Type;
+
 export const GitSubmitPullRequestReviewInput = Schema.Struct({
   cwd: TrimmedNonEmptyStringSchema,
   pullRequestUrl: TrimmedNonEmptyStringSchema,
@@ -299,6 +307,11 @@ export const GitListRelevantPullRequestsResult = Schema.Struct({
   pullRequests: Schema.Array(RelevantChangeRequest),
 });
 export type GitListRelevantPullRequestsResult = typeof GitListRelevantPullRequestsResult.Type;
+
+export const GitGetPullRequestReviewContextResult = Schema.Struct({
+  context: PullRequestReviewContext,
+});
+export type GitGetPullRequestReviewContextResult = typeof GitGetPullRequestReviewContextResult.Type;
 
 export const GitSubmitPullRequestReviewResult = Schema.Struct({
   submitted: Schema.Literal(true),

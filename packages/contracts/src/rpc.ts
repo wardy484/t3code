@@ -43,6 +43,8 @@ import {
   GitPreparePullRequestThreadResult,
   GitListRelevantPullRequestsInput,
   GitListRelevantPullRequestsResult,
+  GitGetPullRequestReviewContextInput,
+  GitGetPullRequestReviewContextResult,
   GitSubmitPullRequestReviewInput,
   GitSubmitPullRequestReviewResult,
   VcsPullInput,
@@ -208,6 +210,7 @@ export const WS_METHODS = {
   // Git workflow methods
   gitRunStackedAction: "git.runStackedAction",
   gitListRelevantPullRequests: "git.listRelevantPullRequests",
+  gitGetPullRequestReviewContext: "git.getPullRequestReviewContext",
   gitSubmitPullRequestReview: "git.submitPullRequestReview",
   gitResolvePullRequest: "git.resolvePullRequest",
   gitPreparePullRequestThread: "git.preparePullRequestThread",
@@ -550,6 +553,15 @@ export const WsGitListRelevantPullRequestsRpc = Rpc.make(WS_METHODS.gitListRelev
   error: Schema.Union([GitManagerServiceError, EnvironmentAuthorizationError]),
 });
 
+export const WsGitGetPullRequestReviewContextRpc = Rpc.make(
+  WS_METHODS.gitGetPullRequestReviewContext,
+  {
+    payload: GitGetPullRequestReviewContextInput,
+    success: GitGetPullRequestReviewContextResult,
+    error: Schema.Union([GitManagerServiceError, EnvironmentAuthorizationError]),
+  },
+);
+
 export const WsGitSubmitPullRequestReviewRpc = Rpc.make(WS_METHODS.gitSubmitPullRequestReview, {
   payload: GitSubmitPullRequestReviewInput,
   success: GitSubmitPullRequestReviewResult,
@@ -865,6 +877,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsVcsRefreshStatusRpc,
   WsGitRunStackedActionRpc,
   WsGitListRelevantPullRequestsRpc,
+  WsGitGetPullRequestReviewContextRpc,
   WsGitSubmitPullRequestReviewRpc,
   WsGitResolvePullRequestRpc,
   WsGitPreparePullRequestThreadRpc,

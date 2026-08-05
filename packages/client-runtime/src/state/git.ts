@@ -13,6 +13,10 @@ export function createGitEnvironmentAtoms<R, E>(
       label: "environment-data:git:relevant-pull-requests",
       tag: WS_METHODS.gitListRelevantPullRequests,
     }),
+    pullRequestReviewContext: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:git:pull-request-review-context",
+      tag: WS_METHODS.gitGetPullRequestReviewContext,
+    }),
     submitPullRequestReview: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:git:submit-pull-request-review",
       tag: WS_METHODS.gitSubmitPullRequestReview,

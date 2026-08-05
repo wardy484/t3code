@@ -76,6 +76,11 @@ import { vcsEnvironment } from "../state/vcs";
 import { buildBaseRefChoices, filterBaseRefChoices } from "../lib/baseRefChoices";
 import { buildPullRequestReviewComments } from "../pullRequestReview";
 import { PullRequestReviewDialog } from "./PullRequestReviewDialog";
+import { PullRequestReviewBrief } from "./PullRequestReviewBrief";
+import {
+  selectPullRequestReviewBrief,
+  usePullRequestReviewContextStore,
+} from "../pullRequestReviewContextStore";
 
 type DiffRenderMode = "stacked" | "split";
 type DiffThemeType = "light" | "dark";
@@ -221,6 +226,9 @@ export default function DiffPanel({
     strict: false,
     select: (params) => resolveThreadRouteRef(params),
   });
+  const pullRequestReviewBrief = usePullRequestReviewContextStore((state) =>
+    selectPullRequestReviewBrief(state.byThreadKey, routeThreadRef),
+  );
   const activeThreadId = routeThreadRef?.threadId ?? null;
   const activeThread = useThread(routeThreadRef);
   const activeProjectId = activeThread?.projectId ?? null;
@@ -861,6 +869,7 @@ export default function DiffPanel({
 
   return (
     <DiffPanelShell mode={mode} header={headerRow}>
+      {pullRequestReviewBrief ? <PullRequestReviewBrief brief={pullRequestReviewBrief} /> : null}
       {activeThread && activeCwd && currentPullRequest?.state === "open" ? (
         <PullRequestReviewDialog
           open={reviewDialogOpen}

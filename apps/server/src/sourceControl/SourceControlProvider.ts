@@ -6,6 +6,7 @@ import type {
   ChangeRequestReviewEvent,
   ChangeRequestState,
   RelevantChangeRequest,
+  PullRequestReviewContext,
   SourceControlProviderError,
   SourceControlProviderInfo,
   SourceControlProviderKind,
@@ -104,6 +105,11 @@ export class SourceControlProvider extends Context.Service<
       readonly context?: SourceControlProviderContext;
       readonly limit?: number;
     }) => Effect.Effect<ReadonlyArray<RelevantChangeRequest>, SourceControlProviderError>;
+    readonly getPullRequestReviewContext?: (input: {
+      readonly cwd: string;
+      readonly pullRequestUrl: string;
+      readonly pullRequestNumber: number;
+    }) => Effect.Effect<PullRequestReviewContext, SourceControlProviderError>;
     readonly submitChangeRequestReview?: (input: {
       readonly cwd: string;
       readonly context?: SourceControlProviderContext;

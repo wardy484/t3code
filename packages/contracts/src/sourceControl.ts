@@ -52,6 +52,33 @@ export const RelevantChangeRequest = Schema.Struct({
 });
 export type RelevantChangeRequest = typeof RelevantChangeRequest.Type;
 
+export const PullRequestReviewContextComment = Schema.Struct({
+  id: TrimmedNonEmptyString,
+  kind: Schema.Literals(["issue", "review", "inline"]),
+  authorLogin: Schema.NullOr(TrimmedNonEmptyString),
+  body: Schema.String,
+  createdAt: Schema.NullOr(IsoDateTime),
+  url: Schema.NullOr(Schema.String),
+  path: Schema.NullOr(TrimmedNonEmptyString),
+  line: Schema.NullOr(PositiveInt),
+  state: Schema.NullOr(TrimmedNonEmptyString),
+});
+export type PullRequestReviewContextComment = typeof PullRequestReviewContextComment.Type;
+
+export const PullRequestReviewContextFile = Schema.Struct({
+  path: TrimmedNonEmptyString,
+  additions: Schema.Number,
+  deletions: Schema.Number,
+});
+export type PullRequestReviewContextFile = typeof PullRequestReviewContextFile.Type;
+
+export const PullRequestReviewContext = Schema.Struct({
+  body: Schema.String,
+  comments: Schema.Array(PullRequestReviewContextComment),
+  files: Schema.Array(PullRequestReviewContextFile),
+});
+export type PullRequestReviewContext = typeof PullRequestReviewContext.Type;
+
 export const ChangeRequestReviewEvent = Schema.Literals(["comment", "approve", "request-changes"]);
 export type ChangeRequestReviewEvent = typeof ChangeRequestReviewEvent.Type;
 

@@ -1,5 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
-import { scopeProjectRef } from "@t3tools/client-runtime/environment";
+import { scopeProjectRef, scopeThreadRef } from "@t3tools/client-runtime/environment";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/models";
 import type { RelevantChangeRequest } from "@t3tools/contracts";
 import { createFileRoute, Link } from "@tanstack/react-router";
@@ -37,11 +37,14 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 import { useProjects } from "../state/entities";
 import { gitEnvironment } from "../state/git";
+import { useAtomCommand } from "../state/use-atom-command";
 import { useEnvironmentQuery } from "../state/query";
 import { serverEnvironment } from "../state/server";
 import { formatRelativeTimeLabel } from "../timestampFormat";
 import { COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS } from "../workspaceTitlebar";
 import { cn } from "../lib/utils";
+import { openPullRequestReviewWorkspace } from "../pullRequestReviewWorkspace";
+import { usePullRequestReviewContextStore } from "../pullRequestReviewContextStore";
 
 interface PullRequestSourceSnapshot {
   readonly project: EnvironmentProject;
@@ -100,6 +103,9 @@ function PullRequestActions({
     environmentId: item.project.environmentId,
     cwd: item.project.workspaceRoot,
   });
+  const getReviewContext = useAtomCommand(gitEnvironment.pullRequestReviewContext, {
+    reportFailure: false,
+  });
   const pullRequest = item.pullRequest;
 
   const startThread = useCallback(
@@ -108,6 +114,20 @@ function PullRequestActions({
       setStartingAction(action);
       const threadId = newThreadId();
       try {
+        const reviewContext =
+          action === "review"
+            ? await getReviewContext({
+                environmentId: item.project.environmentId,
+                input: {
+                  cwd: item.project.workspaceRoot,
+                  pullRequestUrl: pullRequest.url,
+                  pullRequestNumber: pullRequest.number,
+                },
+              })
+            : null;
+        if (reviewContext?._tag === "Failure") {
+          throw squashAtomCommandFailure(reviewContext);
+        }
         const prepared = await preparePullRequest.run({
           reference: pullRequest.url,
           mode: "worktree",
@@ -128,6 +148,19 @@ function PullRequestActions({
             showMeSkillAvailable: hasShowMeSkill(providers),
           }),
         });
+        if (action === "review") {
+          const threadRef = scopeThreadRef(item.project.environmentId, threadId);
+          if (reviewContext?._tag === "Success") {
+            usePullRequestReviewContextStore.getState().set(threadRef, {
+              number: pullRequest.number,
+              title: pullRequest.title,
+              url: pullRequest.url,
+              repositoryNameWithOwner: pullRequest.repositoryNameWithOwner,
+              context: reviewContext.value.context,
+            });
+          }
+          openPullRequestReviewWorkspace(threadRef, pullRequest.baseRefName);
+        }
       } catch (error) {
         toastManager.add(
           stackedThreadToast({
@@ -141,7 +174,15 @@ function PullRequestActions({
         setStartingAction(null);
       }
     },
-    [handleNewThread, item.project, preparePullRequest, providers, pullRequest, startingAction],
+    [
+      getReviewContext,
+      handleNewThread,
+      item.project,
+      preparePullRequest,
+      providers,
+      pullRequest,
+      startingAction,
+    ],
   );
 
   return (

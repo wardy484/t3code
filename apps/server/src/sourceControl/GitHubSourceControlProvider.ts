@@ -16,6 +16,7 @@ import {
   decodeGitHubPullRequestListJson,
   decodeGitHubSearchPullRequestListJson,
 } from "./gitHubPullRequests.ts";
+import { decodeGitHubReviewContext } from "./gitHubReviewContext.ts";
 import * as SourceControlProvider from "./SourceControlProvider.ts";
 import {
   combinedAuthOutput,
@@ -268,6 +269,64 @@ export const make = Effect.gen(function* () {
     );
   };
 
+  const getPullRequestReviewContext: NonNullable<
+    SourceControlProvider.SourceControlProvider["Service"]["getPullRequestReviewContext"]
+  > = (input) => {
+    const repository = repositoryNameWithOwnerFromPullRequestUrl(input.pullRequestUrl);
+    if (!repository) {
+      return Effect.fail(
+        new SourceControlProviderError({
+          provider: "github",
+          operation: "getPullRequestReviewContext",
+          command: "gh",
+          cwd: input.cwd,
+          detail: "The pull request URL does not identify a GitHub repository.",
+        }),
+      );
+    }
+
+    return Effect.all(
+      [
+        github.execute({
+          cwd: input.cwd,
+          args: ["pr", "view", input.pullRequestUrl, "--json", "body,comments,reviews,files"],
+        }),
+        github.execute({
+          cwd: input.cwd,
+          args: [
+            "api",
+            `repos/${repository}/pulls/${input.pullRequestNumber}/comments?per_page=100`,
+          ],
+        }),
+      ],
+      { concurrency: "unbounded" },
+    ).pipe(
+      Effect.flatMap(([view, inlineComments]) => {
+        const decoded = decodeGitHubReviewContext(view.stdout, inlineComments.stdout);
+        return Result.isSuccess(decoded)
+          ? Effect.succeed(decoded.success)
+          : Effect.fail(
+              new GitHubCli.GitHubChangeRequestListDecodeError({
+                command: "gh",
+                cwd: input.cwd,
+                cause: decoded.failure,
+              }),
+            );
+      }),
+      Effect.mapError(
+        (error) =>
+          new SourceControlProviderError({
+            provider: "github",
+            operation: "getPullRequestReviewContext",
+            command: error.command,
+            cwd: input.cwd,
+            detail: error.detail,
+            cause: error,
+          }),
+      ),
+    );
+  };
+
   const listChangeRequests: SourceControlProvider.SourceControlProvider["Service"]["listChangeRequests"] =
     (input) => {
       if (input.state === "open") {
@@ -358,6 +417,7 @@ export const make = Effect.gen(function* () {
   return SourceControlProvider.SourceControlProvider.of({
     kind: "github",
     listRelevantChangeRequests,
+    getPullRequestReviewContext,
     submitChangeRequestReview,
     listChangeRequests,
     getChangeRequest: (input) =>

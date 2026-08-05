@@ -20,6 +20,8 @@ import {
   GitPreparePullRequestThreadResult,
   GitListRelevantPullRequestsInput,
   GitListRelevantPullRequestsResult,
+  GitGetPullRequestReviewContextInput,
+  GitGetPullRequestReviewContextResult,
   GitSubmitPullRequestReviewInput,
   GitSubmitPullRequestReviewResult,
   GitPullRequestRefInput,
@@ -100,6 +102,9 @@ export class GitManager extends Context.Service<
     readonly listRelevantPullRequests: (
       input: GitListRelevantPullRequestsInput,
     ) => Effect.Effect<GitListRelevantPullRequestsResult, GitManagerServiceError>;
+    readonly getPullRequestReviewContext: (
+      input: GitGetPullRequestReviewContextInput,
+    ) => Effect.Effect<GitGetPullRequestReviewContextResult, GitManagerServiceError>;
     readonly submitPullRequestReview: (
       input: GitSubmitPullRequestReviewInput,
     ) => Effect.Effect<GitSubmitPullRequestReviewResult, GitManagerServiceError>;
@@ -2157,6 +2162,20 @@ export const make = Effect.gen(function* () {
     return { supported: true, pullRequests };
   });
 
+  const getPullRequestReviewContext: GitManager["Service"]["getPullRequestReviewContext"] =
+    Effect.fn("getPullRequestReviewContext")(function* (input) {
+      const provider = yield* sourceControlProvider(input.cwd);
+      if (provider.kind !== "github" || !provider.getPullRequestReviewContext) {
+        return yield* new GitManagerError({
+          operation: "getPullRequestReviewContext",
+          cwd: input.cwd,
+          detail: "GitHub pull request context is unavailable for this repository.",
+        });
+      }
+      const context = yield* provider.getPullRequestReviewContext(input);
+      return { context };
+    });
+
   const submitPullRequestReview: GitManager["Service"]["submitPullRequestReview"] = Effect.fn(
     "submitPullRequestReview",
   )(function* (input) {
@@ -2185,6 +2204,7 @@ export const make = Effect.gen(function* () {
     invalidateStatus,
     resolvePullRequest,
     listRelevantPullRequests,
+    getPullRequestReviewContext,
     submitPullRequestReview,
     preparePullRequestThread,
     runStackedAction,
