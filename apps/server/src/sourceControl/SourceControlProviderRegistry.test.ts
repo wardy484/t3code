@@ -109,6 +109,7 @@ it.effect("routes GitHub remotes to the GitHub provider", () =>
     const provider = yield* registry.resolve({ cwd: "/repo" });
 
     assert.strictEqual(provider.kind, "github");
+    assert.strictEqual(typeof provider.getPullRequestReviewContext, "function");
   }),
 );
 

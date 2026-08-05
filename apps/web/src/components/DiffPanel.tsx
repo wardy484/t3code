@@ -71,6 +71,8 @@ import {
 } from "./ui/menu";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 import { useEnvironmentQuery } from "../state/query";
+import { useAtomCommand } from "../state/use-atom-command";
+import { gitEnvironment } from "../state/git";
 import { serverEnvironment } from "../state/server";
 import { reviewEnvironment } from "../state/review";
 import { vcsEnvironment } from "../state/vcs";
@@ -98,6 +100,14 @@ interface CollapsedDiffFilesState {
 }
 
 const EMPTY_COLLAPSED_DIFF_FILE_KEYS: ReadonlySet<string> = new Set();
+
+function repositoryNameWithOwnerFromUrl(url: string): string {
+  try {
+    return new URL(url).pathname.split("/").filter(Boolean).slice(0, 2).join("/");
+  } catch {
+    return "GitHub pull request";
+  }
+}
 
 const DIFF_PANEL_UNSAFE_CSS = `
 [data-diffs-header],
@@ -227,6 +237,10 @@ export default function DiffPanel({
   const codeViewRef = useRef<AnnotatableCodeViewHandle>(null);
   const composerDraft = useComposerThreadDraft(composerDraftTarget);
   const setReviewComments = useComposerDraftStore((store) => store.setReviewComments);
+  const getPullRequestReviewContext = useAtomCommand(gitEnvironment.pullRequestReviewContext, {
+    reportFailure: false,
+  });
+  const requestedPullRequestContextKeyRef = useRef<string | null>(null);
 
   const routeThreadRef = useParams({
     strict: false,
@@ -308,6 +322,60 @@ export default function DiffPanel({
   const selectedGitScope = diffSelection.kind === "unstaged" ? "unstaged" : "branch";
   const selectedBaseRef = diffSelection.kind === "branch" ? diffSelection.baseRef : null;
   const currentPullRequest = gitStatusQuery.data?.pr;
+
+  useEffect(() => {
+    if (
+      pullRequestReviewBrief ||
+      !routeThreadRef ||
+      !activeThread ||
+      !activeCwd ||
+      currentPullRequest?.state !== "open"
+    ) {
+      return;
+    }
+    const requestKey = `${routeThreadRef.environmentId}:${routeThreadRef.threadId}:${currentPullRequest.url}`;
+    if (requestedPullRequestContextKeyRef.current === requestKey) return;
+    requestedPullRequestContextKeyRef.current = requestKey;
+
+    void getPullRequestReviewContext({
+      environmentId: activeThread.environmentId,
+      input: {
+        cwd: activeCwd,
+        pullRequestUrl: currentPullRequest.url,
+        pullRequestNumber: currentPullRequest.number,
+      },
+    }).then((result) => {
+      if (result._tag === "Failure") {
+        const failure = squashAtomCommandFailure(result);
+        console.warn("Failed to load pull request context for the review workspace.", {
+          operation: "load-pull-request-review-context",
+          environmentId: routeThreadRef.environmentId,
+          threadId: routeThreadRef.threadId,
+          detail: failure instanceof Error ? failure.message : String(failure),
+          ...safeErrorLogAttributes(failure),
+        });
+        return;
+      }
+      usePullRequestReviewContextStore.getState().set(routeThreadRef, {
+        number: currentPullRequest.number,
+        title: currentPullRequest.title,
+        url: currentPullRequest.url,
+        repositoryNameWithOwner: repositoryNameWithOwnerFromUrl(currentPullRequest.url),
+        context: result.value.context,
+      });
+      useDiffPanelStore
+        .getState()
+        .selectBranchBaseRef(routeThreadRef, `origin/${currentPullRequest.baseRef}`);
+    });
+  }, [
+    activeCwd,
+    activeThread,
+    currentPullRequest,
+    getPullRequestReviewContext,
+    pullRequestReviewBrief,
+    routeThreadRef,
+  ]);
+
   const comparisonBaseRef =
     selectedBaseRef ?? (currentPullRequest?.state === "open" ? currentPullRequest.baseRef : null);
   const selectedFilePath = diffSelection.kind === "turn" ? diffSelection.filePath : null;

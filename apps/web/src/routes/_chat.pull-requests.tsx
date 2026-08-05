@@ -114,17 +114,6 @@ function PullRequestActions({
       setStartingAction(action);
       const threadId = newThreadId();
       try {
-        const reviewContext =
-          action === "review"
-            ? await getReviewContext({
-                environmentId: item.project.environmentId,
-                input: {
-                  cwd: item.project.workspaceRoot,
-                  pullRequestUrl: pullRequest.url,
-                  pullRequestNumber: pullRequest.number,
-                },
-              })
-            : null;
         const prepared = await preparePullRequest.run({
           reference: pullRequest.url,
           mode: "worktree",
@@ -133,6 +122,28 @@ function PullRequestActions({
         if (prepared._tag === "Failure") {
           if (isAtomCommandInterrupted(prepared)) preparePullRequest.resetError();
           throw squashAtomCommandFailure(prepared);
+        }
+        if (action === "review") {
+          const reviewContext = await getReviewContext({
+            environmentId: item.project.environmentId,
+            input: {
+              cwd: prepared.value.worktreePath ?? item.project.workspaceRoot,
+              pullRequestUrl: pullRequest.url,
+              pullRequestNumber: pullRequest.number,
+            },
+          });
+          if (reviewContext._tag === "Failure") {
+            throw squashAtomCommandFailure(reviewContext);
+          }
+          const threadRef = scopeThreadRef(item.project.environmentId, threadId);
+          usePullRequestReviewContextStore.getState().set(threadRef, {
+            number: pullRequest.number,
+            title: pullRequest.title,
+            url: pullRequest.url,
+            repositoryNameWithOwner: pullRequest.repositoryNameWithOwner,
+            context: reviewContext.value.context,
+          });
+          openPullRequestReviewWorkspace(threadRef, pullRequest.baseRefName);
         }
         await handleNewThread(scopeProjectRef(item.project.environmentId, item.project.id), {
           branch: prepared.value.branch,
@@ -145,19 +156,6 @@ function PullRequestActions({
             showMeSkillAvailable: hasShowMeSkill(providers),
           }),
         });
-        if (action === "review") {
-          const threadRef = scopeThreadRef(item.project.environmentId, threadId);
-          if (reviewContext?._tag === "Success") {
-            usePullRequestReviewContextStore.getState().set(threadRef, {
-              number: pullRequest.number,
-              title: pullRequest.title,
-              url: pullRequest.url,
-              repositoryNameWithOwner: pullRequest.repositoryNameWithOwner,
-              context: reviewContext.value.context,
-            });
-          }
-          openPullRequestReviewWorkspace(threadRef, pullRequest.baseRefName);
-        }
       } catch (error) {
         toastManager.add(
           stackedThreadToast({

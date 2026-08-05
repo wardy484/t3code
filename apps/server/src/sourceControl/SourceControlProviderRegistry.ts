@@ -158,6 +158,7 @@ function bindProviderContext(
   }
 
   const listRelevantChangeRequests = provider.listRelevantChangeRequests;
+  const getPullRequestReviewContext = provider.getPullRequestReviewContext;
   const submitChangeRequestReview = provider.submitChangeRequestReview;
   return SourceControlProvider.SourceControlProvider.of({
     kind: provider.kind,
@@ -168,6 +169,11 @@ function bindProviderContext(
               ...input,
               context: input.context ?? context,
             }),
+        }
+      : {}),
+    ...(getPullRequestReviewContext
+      ? {
+          getPullRequestReviewContext,
         }
       : {}),
     ...(submitChangeRequestReview

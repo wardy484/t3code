@@ -206,7 +206,7 @@ it.effect("fetches and combines the complete pull request review context", () =>
         "--json",
         "body,comments,reviews,files",
       ],
-      ["api", "repos/pingdotgg/t3code/pulls/42/comments?per_page=100", "--paginate", "--slurp"],
+      ["api", "repos/pingdotgg/t3code/pulls/42/comments?per_page=100"],
     ]);
     assert.strictEqual(context.body, "Why this changed");
     assert.deepStrictEqual(context.comments[0], {
