@@ -59,10 +59,11 @@ export const make = Effect.gen(function* () {
 
   const assertWorkspaceBoundCwd = Effect.fn("ReviewService.assertWorkspaceBoundCwd")(function* (
     cwd: string,
+    workspaceRootInput?: string,
   ) {
     const [candidate, workspaceRoot, worktreesRoot] = yield* Effect.all([
       canonicalizePath(cwd),
-      canonicalizePath(config.cwd),
+      canonicalizePath(workspaceRootInput ?? config.cwd),
       canonicalizePath(config.worktreesDir),
     ]);
 
@@ -73,7 +74,7 @@ export const make = Effect.gen(function* () {
     const linkedWorktreeRoots = yield* git
       .execute({
         operation: "ReviewService.assertWorkspaceBoundCwd.listWorktrees",
-        cwd: config.cwd,
+        cwd: workspaceRoot,
         args: ["worktree", "list", "--porcelain", "-z"],
       })
       .pipe(
@@ -102,7 +103,7 @@ export const make = Effect.gen(function* () {
   const getDiffPreview: ReviewService["Service"]["getDiffPreview"] = Effect.fn(
     "ReviewService.getDiffPreview",
   )(function* (input) {
-    yield* assertWorkspaceBoundCwd(input.cwd);
+    yield* assertWorkspaceBoundCwd(input.cwd, input.workspaceRoot);
 
     const handle = yield* vcsRegistry.detect({ cwd: input.cwd, requestedKind: "auto" });
     if (!handle) {

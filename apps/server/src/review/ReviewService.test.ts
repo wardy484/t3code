@@ -15,6 +15,7 @@ function makeLayer(input: {
   readonly workspaceRoot: string;
   readonly baseDir: string;
   readonly detectCalls?: Array<{ readonly cwd: string }>;
+  readonly worktreeListCalls?: Array<{ readonly cwd: string }>;
   readonly linkedWorktrees?: ReadonlyArray<string>;
 }) {
   return ReviewService.layer.pipe(
@@ -31,15 +32,18 @@ function makeLayer(input: {
     ),
     Layer.provide(
       Layer.mock(GitVcsDriver.GitVcsDriver)({
-        execute: () =>
-          Effect.succeed({
-            exitCode: ChildProcessSpawner.ExitCode(0),
-            stdout: (input.linkedWorktrees ?? [])
-              .map((worktree) => `worktree ${worktree}\0HEAD abc\0\0`)
-              .join(""),
-            stderr: "",
-            stdoutTruncated: false,
-            stderrTruncated: false,
+        execute: ({ cwd }) =>
+          Effect.sync(() => {
+            input.worktreeListCalls?.push({ cwd });
+            return {
+              exitCode: ChildProcessSpawner.ExitCode(0),
+              stdout: (input.linkedWorktrees ?? [])
+                .map((worktree) => `worktree ${worktree}\0HEAD abc\0\0`)
+                .join(""),
+              stderr: "",
+              stdoutTruncated: false,
+              stderrTruncated: false,
+            };
           }),
       }),
     ),
@@ -56,6 +60,7 @@ describe("ReviewService", () => {
       const outsideRoot = yield* fs.makeTempDirectoryScoped({ prefix: "t3-review-outside-" });
       const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-review-base-" });
       const detectCalls: Array<{ readonly cwd: string }> = [];
+      const worktreeListCalls: Array<{ readonly cwd: string }> = [];
 
       const error = yield* Effect.gen(function* () {
         const review = yield* ReviewService.ReviewService;
@@ -117,6 +122,40 @@ describe("ReviewService", () => {
       assert.strictEqual(result.cwd, linkedWorktree);
       assert.deepStrictEqual(result.sources, []);
       assert.deepStrictEqual(detectCalls, [{ cwd: linkedWorktree }]);
+    }).pipe(Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect("validates a project worktree against the project root instead of the server cwd", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const serverRoot = yield* fs.makeTempDirectoryScoped({ prefix: "t3-review-server-" });
+      const projectRoot = yield* fs.makeTempDirectoryScoped({ prefix: "t3-review-project-" });
+      const linkedWorktree = yield* fs.makeTempDirectoryScoped({ prefix: "t3-review-linked-" });
+      const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-review-base-" });
+      const detectCalls: Array<{ readonly cwd: string }> = [];
+      const worktreeListCalls: Array<{ readonly cwd: string }> = [];
+
+      const result = yield* Effect.gen(function* () {
+        const review = yield* ReviewService.ReviewService;
+        return yield* review.getDiffPreview({
+          cwd: linkedWorktree,
+          workspaceRoot: projectRoot,
+        });
+      }).pipe(
+        Effect.provide(
+          makeLayer({
+            workspaceRoot: serverRoot,
+            baseDir,
+            linkedWorktrees: [linkedWorktree],
+            detectCalls,
+            worktreeListCalls,
+          }),
+        ),
+      );
+
+      assert.strictEqual(result.cwd, linkedWorktree);
+      assert.deepStrictEqual(detectCalls, [{ cwd: linkedWorktree }]);
+      assert.deepStrictEqual(worktreeListCalls, [{ cwd: projectRoot }]);
     }).pipe(Effect.provide(NodeServices.layer)),
   );
 

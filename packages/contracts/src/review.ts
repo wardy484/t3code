@@ -5,6 +5,7 @@ import { VcsError } from "./vcs.ts";
 
 export const ReviewDiffPreviewInput = Schema.Struct({
   cwd: TrimmedNonEmptyString,
+  workspaceRoot: Schema.optional(TrimmedNonEmptyString),
   baseRef: Schema.optional(TrimmedNonEmptyString),
   ignoreWhitespace: Schema.optionalKey(Schema.Boolean),
 });
