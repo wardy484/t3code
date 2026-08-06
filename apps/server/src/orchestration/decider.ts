@@ -526,32 +526,45 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
           });
         }
       }
-
-      return yield* Effect.forEach(family, (member) =>
-        Effect.gen(function* () {
-          // Settling an already-settled thread re-emits with the original
-          // settledAt: the engine rejects zero-event commands, and bulk-settle /
-          // double-click must stay silent no-ops rather than surface errors.
-          const alreadySettled = member.settledOverride === "settled" && member.settledAt !== null;
-          return {
+      const events: PlannedOrchestrationEvent[] = [];
+      for (const member of family) {
+        // Settling an already-settled thread re-emits with the original
+        // settledAt: the engine rejects zero-event commands, and bulk-settle /
+        // double-click must stay silent no-ops rather than surface errors.
+        const alreadySettled = member.settledOverride === "settled" && member.settledAt !== null;
+        events.push({
+          ...(yield* withEventBase({
+            aggregateKind: "thread",
+            aggregateId: member.id,
+            occurredAt,
+            commandId: command.commandId,
+          })),
+          type: "thread.settled",
+          payload: {
+            threadId: member.id,
+            settledAt: alreadySettled ? member.settledAt : occurredAt,
+            updatedAt: alreadySettled ? member.updatedAt : occurredAt,
+          },
+        });
+        // Settling is "I'm done with this": it clears a pin for every member
+        // parked by the delegated-family settle operation.
+        if (member.pinnedAt != null) {
+          events.push({
             ...(yield* withEventBase({
               aggregateKind: "thread",
               aggregateId: member.id,
               occurredAt,
               commandId: command.commandId,
             })),
-            type: "thread.settled" as const,
+            type: "thread.unpinned",
             payload: {
               threadId: member.id,
-              settledAt: alreadySettled ? member.settledAt : occurredAt,
-              // A re-emission is a projected no-op: keep the existing updatedAt
-              // so duplicate settles neither rewind nor churn ordering. A fresh
-              // settle stamps the command time.
-              updatedAt: alreadySettled ? member.updatedAt : occurredAt,
+              updatedAt: occurredAt,
             },
-          };
-        }),
-      );
+          });
+        }
+      }
+      return events;
     }
 
     case "thread.unsettle": {
@@ -674,6 +687,98 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
           threadId: command.threadId,
           reason: command.reason,
           updatedAt: alreadyAwake ? thread.updatedAt : occurredAt,
+        },
+      };
+    }
+
+    case "thread.pin": {
+      const thread = yield* requireThreadNotArchived({
+        readModel,
+        command,
+        threadId: command.threadId,
+      });
+      const occurredAt = yield* nowIso;
+      // Re-pinning an already-pinned thread is a duplicate (double-click,
+      // raced clients): re-emit with the original timestamps so the
+      // projection is a no-op. Pinning has no lifecycle invariants — a pin
+      // only ever promotes visibility, so it can never hide pending work.
+      const existingPinnedAt = thread.pinnedAt ?? null;
+      const pinnedEvent = {
+        ...(yield* withEventBase({
+          aggregateKind: "thread",
+          aggregateId: command.threadId,
+          occurredAt,
+          commandId: command.commandId,
+        })),
+        type: "thread.pinned" as const,
+        payload: {
+          threadId: command.threadId,
+          pinnedAt: existingPinnedAt ?? occurredAt,
+          updatedAt: existingPinnedAt !== null ? thread.updatedAt : occurredAt,
+        },
+      };
+      // Pinning is a promotion: it clears the parked states rather than
+      // silently outranking them. An explicit settle un-settles (reason
+      // "user", same override the un-settle button stamps), and a snooze's
+      // return ticket is spent — the thread is on top NOW, not on Tuesday.
+      const promotionEvents: Array<Omit<OrchestrationEvent, "sequence">> = [];
+      if (thread.settledOverride === "settled") {
+        promotionEvents.push({
+          ...(yield* withEventBase({
+            aggregateKind: "thread",
+            aggregateId: command.threadId,
+            occurredAt,
+            commandId: command.commandId,
+          })),
+          type: "thread.unsettled",
+          payload: {
+            threadId: command.threadId,
+            reason: "user",
+            updatedAt: occurredAt,
+          },
+        });
+      }
+      if (thread.snoozedUntil != null) {
+        promotionEvents.push({
+          ...(yield* withEventBase({
+            aggregateKind: "thread",
+            aggregateId: command.threadId,
+            occurredAt,
+            commandId: command.commandId,
+          })),
+          type: "thread.unsnoozed",
+          payload: {
+            threadId: command.threadId,
+            reason: "user",
+            updatedAt: occurredAt,
+          },
+        });
+      }
+      return promotionEvents.length > 0 ? [pinnedEvent, ...promotionEvents] : pinnedEvent;
+    }
+
+    case "thread.unpin": {
+      const thread = yield* requireThreadNotArchived({
+        readModel,
+        command,
+        threadId: command.threadId,
+      });
+      // Idempotent by re-emission (see thread.settle): unpinning a thread
+      // that is not pinned lands on the same null state without churning
+      // updatedAt.
+      const alreadyUnpinned = thread.pinnedAt == null;
+      const occurredAt = yield* nowIso;
+      return {
+        ...(yield* withEventBase({
+          aggregateKind: "thread",
+          aggregateId: command.threadId,
+          occurredAt,
+          commandId: command.commandId,
+        })),
+        type: "thread.unpinned",
+        payload: {
+          threadId: command.threadId,
+          updatedAt: alreadyUnpinned ? thread.updatedAt : occurredAt,
         },
       };
     }

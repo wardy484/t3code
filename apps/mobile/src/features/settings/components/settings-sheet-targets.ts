@@ -3,6 +3,7 @@ export type SettingsSheetTarget =
   | "SettingsEnvironmentFiles"
   | "SettingsArchive"
   | "SettingsAppearance"
+  | "SettingsProjectGrouping"
   | "SettingsClientStorage";
 
 export type SettingsLegalDocumentTarget = "SettingsLegal";

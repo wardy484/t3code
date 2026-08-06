@@ -14,6 +14,16 @@ export interface PullRequestReviewComments {
   readonly skippedCount: number;
 }
 
+export function matchesPullRequestBaseRef(
+  selectedBaseRef: string | null | undefined,
+  pullRequestBaseRef: string,
+): boolean {
+  if (!selectedBaseRef) return false;
+  return (
+    selectedBaseRef === pullRequestBaseRef || selectedBaseRef === `origin/${pullRequestBaseRef}`
+  );
+}
+
 export function buildPullRequestReviewComments(
   reviewComments: ReadonlyArray<ReviewCommentContext>,
   files: ReadonlyArray<PullRequestReviewDiffFile>,

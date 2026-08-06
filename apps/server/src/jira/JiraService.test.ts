@@ -11,6 +11,7 @@ import * as ServerConfig from "../config.ts";
 import { JiraService, jiraBranchName, jiraDescriptionText, layer } from "./JiraService.ts";
 
 const requests: Array<HttpClientRequest.HttpClientRequest> = [];
+const decodeUnknownJsonString = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown));
 
 function jsonResponse(body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -341,9 +342,7 @@ describe("JiraService", () => {
         assert.equal(assignmentRequest?.body._tag, "Uint8Array");
         const assignmentBody =
           assignmentRequest?.body._tag === "Uint8Array"
-            ? yield* Schema.decodeUnknownEffect(Schema.UnknownFromJsonString)(
-                new TextDecoder().decode(assignmentRequest.body.body),
-              )
+            ? yield* decodeUnknownJsonString(new TextDecoder().decode(assignmentRequest.body.body))
             : null;
         assert.deepEqual(assignmentBody, { accountId: "account-1" });
       }),

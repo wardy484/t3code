@@ -106,6 +106,35 @@ it.layer(NodeServices.layer)("settled thread decider", (it) => {
     }),
   );
 
+  it.effect("unpins every pinned member while settling a delegated family", () =>
+    Effect.gen(function* () {
+      const base = makeReadModel(null);
+      const parent = { ...base.threads[0]!, pinnedAt: SETTLED_AT };
+      const child = {
+        ...parent,
+        id: ThreadId.make("thread-child"),
+        parentThreadId: parent.id,
+        title: "Child",
+      };
+      const decided = yield* decideOrchestrationCommand({
+        command: {
+          type: "thread.settle",
+          commandId: CommandId.make("cmd-settle-pinned-family"),
+          threadId: parent.id,
+        },
+        readModel: { ...base, threads: [parent, child] },
+      });
+      const events = Array.isArray(decided) ? decided : [decided];
+
+      expect(events.map((event) => [event.aggregateId, event.type])).toEqual([
+        [child.id, "thread.settled"],
+        [child.id, "thread.unpinned"],
+        [parent.id, "thread.settled"],
+        [parent.id, "thread.unpinned"],
+      ]);
+    }),
+  );
+
   it.effect("rejects the whole family when a delegated child is still working", () =>
     Effect.gen(function* () {
       const base = makeReadModel(null);

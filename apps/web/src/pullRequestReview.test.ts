@@ -2,7 +2,7 @@ import { parsePatchFiles } from "@pierre/diffs/utils/parsePatchFiles";
 import { describe, expect, it } from "vite-plus/test";
 
 import { buildDiffReviewComment } from "./reviewCommentContext";
-import { buildPullRequestReviewComments } from "./pullRequestReview";
+import { buildPullRequestReviewComments, matchesPullRequestBaseRef } from "./pullRequestReview";
 
 const [fileDiff] = parsePatchFiles(`diff --git a/src/value.ts b/src/value.ts
 --- a/src/value.ts
@@ -61,5 +61,18 @@ describe("pull request review comments", () => {
 
     expect(result.comments).toEqual([]);
     expect(result.skippedCount).toBe(0);
+  });
+});
+
+describe("pull request base refs", () => {
+  it("accepts local and origin-prefixed forms of the PR base", () => {
+    expect(matchesPullRequestBaseRef("main", "main")).toBe(true);
+    expect(matchesPullRequestBaseRef("origin/main", "main")).toBe(true);
+    expect(matchesPullRequestBaseRef("origin/release/next", "release/next")).toBe(true);
+  });
+
+  it("rejects a different comparison base", () => {
+    expect(matchesPullRequestBaseRef("origin/develop", "main")).toBe(false);
+    expect(matchesPullRequestBaseRef(null, "main")).toBe(false);
   });
 });

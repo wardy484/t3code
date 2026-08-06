@@ -15,6 +15,8 @@ import * as JiraService from "../jira/JiraService.ts";
 import { SqlitePersistenceMemory } from "../persistence/Layers/Sqlite.ts";
 import { KanbanService, layer } from "./KanbanService.ts";
 
+const encodeUnknownJsonString = Schema.encodeUnknownEffect(Schema.fromJsonString(Schema.Unknown));
+
 const TestLayer = Layer.empty.pipe(
   Layer.provideMerge(layer),
   Layer.provideMerge(JiraService.layer),
@@ -171,16 +173,14 @@ describe("KanbanService", () => {
         yield* addProject(project, "/code/legacy");
         const config = yield* ServerConfig.ServerConfig;
         const fileSystem = yield* FileSystem.FileSystem;
-        const legacyConfiguration = yield* Schema.encodeUnknownEffect(Schema.UnknownFromJsonString)(
-          {
-            baseUrl: "https://tutorful.atlassian.net",
-            email: "kim@example.com",
-            boardId: 123,
-            jql: "project = KG",
-            projectPath: "/code/legacy",
-            baseBranch: "master",
-          },
-        );
+        const legacyConfiguration = yield* encodeUnknownJsonString({
+          baseUrl: "https://tutorful.atlassian.net",
+          email: "kim@example.com",
+          boardId: 123,
+          jql: "project = KG",
+          projectPath: "/code/legacy",
+          baseBranch: "master",
+        });
         yield* fileSystem.writeFileString(config.jiraConfigPath, legacyConfiguration);
         yield* (yield* ServerSecretStore.ServerSecretStore).set(
           "jira-api-token",

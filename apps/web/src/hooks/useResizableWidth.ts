@@ -1,23 +1,9 @@
 import * as Schema from "effect/Schema";
-import {
-  type PointerEvent as ReactPointerEvent,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { type PointerEvent as ReactPointerEvent, useCallback, useRef, useState } from "react";
 
 import { getLocalStorageItem, setLocalStorageItem } from "./useLocalStorage";
 
 const WidthSchema = Schema.Finite;
-const RESIZABLE_WIDTH_REQUEST_EVENT = "t3code:resizable-width-request";
-
-export function requestResizableWidth(storageKey: string, width: number): void {
-  if (typeof window === "undefined") return;
-  window.dispatchEvent(
-    new CustomEvent(RESIZABLE_WIDTH_REQUEST_EVENT, { detail: { storageKey, width } }),
-  );
-}
 
 export interface UseResizableWidthOptions {
   /** localStorage key the persisted width is stored under. */
@@ -76,22 +62,6 @@ export function useResizableWidth(options: UseResizableWidthOptions): {
   });
 
   const clampedWidth = clamp(width);
-
-  useEffect(() => {
-    const onWidthRequest = (event: Event) => {
-      const detail = (event as CustomEvent<{ storageKey?: unknown; width?: unknown }>).detail;
-      if (detail?.storageKey !== storageKey || typeof detail.width !== "number") return;
-      const next = clamp(detail.width);
-      setWidth(next);
-      try {
-        setLocalStorageItem(storageKey, next, WidthSchema);
-      } catch (error) {
-        console.error("Could not persist requested panel width.", error);
-      }
-    };
-    window.addEventListener(RESIZABLE_WIDTH_REQUEST_EVENT, onWidthRequest);
-    return () => window.removeEventListener(RESIZABLE_WIDTH_REQUEST_EVENT, onWidthRequest);
-  }, [clamp, storageKey]);
 
   const dragStateRef = useRef<{
     pointerId: number;
