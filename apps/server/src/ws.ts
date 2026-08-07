@@ -1,5 +1,3 @@
-import * as Cause from "effect/Cause";
-import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -91,6 +89,7 @@ import { issueAssetUrl } from "./assets/AssetAccess.ts";
 import * as PortScanner from "./preview/PortScanner.ts";
 import * as WorkspaceEntries from "./workspace/WorkspaceEntries.ts";
 import * as WorkspaceFileSystem from "./workspace/WorkspaceFileSystem.ts";
+import { readWorkflowScript } from "./orchestration/workflowScriptQuery.ts";
 import * as WorkspacePaths from "./workspace/WorkspacePaths.ts";
 import * as VcsStatusBroadcaster from "./vcs/VcsStatusBroadcaster.ts";
 import * as VcsProvisioningService from "./vcs/VcsProvisioningService.ts";
@@ -327,7 +326,6 @@ const makeWsRpcLayer = (
   WsRpcGroup.toLayer(
     Effect.gen(function* () {
       const currentSessionId = currentSession.sessionId;
-      const crypto = yield* Crypto.Crypto;
       const projectionSnapshotQuery = yield* ProjectionSnapshotQuery.ProjectionSnapshotQuery;
       const orchestrationEngine = yield* OrchestrationEngine.OrchestrationEngineService;
       const checkpointDiffQuery = yield* CheckpointDiffQuery.CheckpointDiffQuery;
@@ -448,14 +446,6 @@ const makeWsRpcLayer = (
               message: cause instanceof Error ? cause.message : fallbackMessage,
               cause,
             });
-      const randomUUID = crypto.randomUUIDv4.pipe(
-        Effect.mapError((cause) =>
-          toDispatchCommandError(cause, "Failed to generate orchestration command identifier."),
-        ),
-      );
-      const serverCommandId = (tag: string) =>
-        randomUUID.pipe(Effect.map((uuid) => CommandId.make(`server:${tag}:${uuid}`)));
-
       const loadAuthAccessSnapshot = () =>
         Effect.all({
           pairingLinks: serverAuth.listPairingLinks(),
@@ -809,6 +799,12 @@ const makeWsRpcLayer = (
                     }),
               ),
             ),
+            { "rpc.aggregate": "orchestration" },
+          ),
+        [ORCHESTRATION_WS_METHODS.getWorkflowScript]: (input) =>
+          observeRpcEffect(
+            ORCHESTRATION_WS_METHODS.getWorkflowScript,
+            readWorkflowScript({ scriptPath: input.scriptPath }),
             { "rpc.aggregate": "orchestration" },
           ),
         [ORCHESTRATION_WS_METHODS.getTurnDiff]: (input) =>

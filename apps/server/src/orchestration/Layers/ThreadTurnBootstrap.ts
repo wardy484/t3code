@@ -234,7 +234,15 @@ const make = Effect.gen(function* () {
 
       if (bootstrap.prepareWorktree) {
         let worktreeBaseRef = bootstrap.prepareWorktree.baseBranch;
-        if (bootstrap.prepareWorktree.startFromOrigin) {
+        // "Start from origin" is a stored default. Repositories without an
+        // origin remote should fall back to the local base branch.
+        const startFromOrigin =
+          bootstrap.prepareWorktree.startFromOrigin === true &&
+          (yield* gitWorkflow.remoteExists({
+            cwd: bootstrap.prepareWorktree.projectCwd,
+            remoteName: "origin",
+          }));
+        if (startFromOrigin) {
           yield* gitWorkflow.fetchRemote({
             cwd: bootstrap.prepareWorktree.projectCwd,
             remoteName: "origin",
